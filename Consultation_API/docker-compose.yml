@@ -4,9 +4,9 @@ services:
   db:
     image: postgres:13
     environment:
-      POSTGRES_DB: API_Consultation
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${NAME}
+      POSTGRES_USER: ${USER}
+      POSTGRES_PASSWORD: ${PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -23,11 +23,11 @@ services:
       - db
     environment:
       - DJANGO_SETTINGS_MODULE=Consultation_API.settings
-      - POSTGRES_DB=API_Consultation
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${NAME}
+      - POSTGRES_USER=${USER}
+      - POSTGRES_PASSWORD=${PASSWORD}
+      - POSTGRES_HOST=${HOST}
+      - POSTGRES_PORT=${PORT}
 
 volumes:
   postgres_data:
