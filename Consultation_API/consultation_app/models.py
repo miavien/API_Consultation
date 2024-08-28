@@ -44,11 +44,19 @@ class Consultation(models.Model):
         ('Other', 'Другое'),
     ]
 
+    STATUS_CHOICE = [
+        ('Pending', 'Ожидает'),
+        ('Accepted', 'Принят'),
+        ('Rejected', 'Отклонён'),
+    ]
+
     slot = models.OneToOneField(Slot, on_delete=models.CASCADE, related_name='consultations', verbose_name='Слот')
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='consultations', verbose_name='Клиент')
     is_canceled = models.BooleanField(default=False, verbose_name='Отменен')
-    cancel_reason = models.CharField(max_length=50, choices=CANCEL_CHOICE, blank=True, verbose_name='Причина отмены')
+    cancel_comment = models.CharField(max_length=255, blank=True, verbose_name='Комментарий при отмене')
+    cancel_reason_choice = models.CharField(max_length=50, choices=CANCEL_CHOICE, blank=True, verbose_name='Причина отмены из списка')
     is_completed = models.BooleanField(default=False, verbose_name='Завершен')
+    status = models.CharField(max_length=15, choices=STATUS_CHOICE, default='Pending', verbose_name='Статус')
 
     def __str__(self):
         return f'Specialist: {self.slot.specialist.username}, client: {self.client.username}'
