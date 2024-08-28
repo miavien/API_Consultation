@@ -48,6 +48,7 @@ class Consultation(models.Model):
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='consultations', verbose_name='Клиент')
     is_canceled = models.BooleanField(default=False, verbose_name='Отменен')
     cancel_reason = models.CharField(max_length=50, choices=CANCEL_CHOICE, blank=True, verbose_name='Причина отмены')
+    is_completed = models.BooleanField(default=False, verbose_name='Завершен')
 
     def __str__(self):
         return f'Specialist: {self.slot.specialist.username}, client: {self.client.username}'
