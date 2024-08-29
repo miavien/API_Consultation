@@ -31,7 +31,7 @@ class Slot(models.Model):
     date = models.DateField(verbose_name='Дата')
     start_time = models.TimeField(verbose_name='Начало')
     end_time = models.TimeField(verbose_name='Окончание')
-    context = models.CharField(max_length=255, blank=True, verbose_name='Контекст')
+    context = models.CharField(max_length=255, blank=True, null=True, verbose_name='Контекст')
     is_available = models.BooleanField(default=True, verbose_name='Доступно')
 
     def __str__(self):

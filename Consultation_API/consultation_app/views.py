@@ -191,18 +191,68 @@ class CreateSlotAPIView(APIView):
     permission_classes = [IsSpecialistUser]
     serializer_class = SlotSerializer
 
+    @extend_schema(
+        summary='Создание слота',
+        description='Метод для создания слотов для консультаций',
+        request=SlotSerializer,
+        responses={
+            200: OpenApiResponse(
+                response=SlotSerializer,
+                description='Успешный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Успешный запрос',
+                        value={'message': 'Слот успешно создан',
+                               'data': {
+                                   'date': '2024-08-30',
+                                   'start_time': '13:00',
+                                   'end_time': '13:30',
+                                   'context': 'Доп. информация'
+                               }
+                               }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=SlotSerializer,
+                description='Неверный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Некорректная дата',
+                        value={'detail': 'Дата не может быть ранее сегодняшнего дня'}
+                    ),
+                    OpenApiExample(
+                        'Некорректное время',
+                        value={'detail': 'Время окончания должно быть позже времени начала'}
+                    )
+                ]
+            )
+        },
+        examples=[
+            OpenApiExample(
+                'Пример запроса',
+                description='Пример запроса',
+                value={'date': '2024-08-30',
+                        'start_time': '13:00',
+                        'end_time': '13:30',
+                        'context': 'Some context here'},
+                status_codes=[str(status.HTTP_202_ACCEPTED)],
+            )
+        ],
+        tags=['For specialist']
+    )
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data, context={'request': request})
         if serializer.is_valid():
             validated_data = serializer.validated_data
             slot_data = {
                 'specialist': request.user,
                 'date': validated_data['date'],
                 'start_time': validated_data['start_time'],
-                'end_time': validated_data['end_time']
+                'end_time': validated_data['end_time'],
+                'context': validated_data.get('context', None)
             }
-            if 'context' in validated_data:
-                slot_data['context'] = validated_data['context']
             slot = Slot.objects.create(**slot_data)
             slot_serializer = SlotSerializer(slot)
             return Response({'message': 'Слот успешно создан', 'data': slot_serializer.data}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
