@@ -1,5 +1,6 @@
 from django.utils import timezone
 from rest_framework import serializers
+from datetime import datetime
 from .models import *
 
 
@@ -34,8 +35,7 @@ class SlotSerializer(serializers.ModelSerializer):
 
         same_time_slots = Slot.objects.filter(
             specialist=specialist,
-            date=date
-        ).filter(
+            date=date,
             start_time__lt=end_time,
             end_time__gt=start_time
         )
@@ -44,3 +44,21 @@ class SlotSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'detail': 'Время слота пересекается с другим слотом'})
 
         return data
+
+class SpecialistSlotListSerializer(serializers.ModelSerializer):
+    duration = serializers.SerializerMethodField()
+    class Meta:
+        model = Slot
+        fields = ['date', 'start_time', 'end_time', 'context', 'is_available', 'duration']
+
+    #метод для вычисления длительности слота
+    def get_duration(self, obj):
+        start_datetime = datetime.combine(obj.date, obj.start_time)
+        end_datetime = datetime.combine(obj.date, obj.end_time)
+        duration = end_datetime - start_datetime
+
+        total_minutes = duration.total_seconds() // 60
+        hours = total_minutes // 60
+        minutes = total_minutes % 60
+
+        return f'{int(hours)}h {int(minutes)}m'

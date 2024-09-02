@@ -1,8 +1,9 @@
 from rest_framework import status
+from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate, login
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample, extend_schema_view
 from .serializers import *
 from .permissions import *
 
@@ -193,7 +194,7 @@ class CreateSlotAPIView(APIView):
 
     @extend_schema(
         summary='Создание слота',
-        description='Метод для создания слотов для консультаций',
+        description='Метод для создания специалистом слотов для консультаций',
         request=SlotSerializer,
         responses={
             200: OpenApiResponse(
@@ -233,9 +234,9 @@ class CreateSlotAPIView(APIView):
                 'Пример запроса',
                 description='Пример запроса',
                 value={'date': '2024-08-30',
-                        'start_time': '13:00',
-                        'end_time': '13:30',
-                        'context': 'Some context here'},
+                       'start_time': '13:00',
+                       'end_time': '13:30',
+                       'context': 'Some context here'},
                 status_codes=[str(status.HTTP_202_ACCEPTED)],
             )
         ],
@@ -256,3 +257,36 @@ class CreateSlotAPIView(APIView):
             slot_serializer = SlotSerializer(slot)
             return Response({'message': 'Слот успешно создан', 'data': slot_serializer.data}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary='Получение всех слотов',
+        description='Получение специалистом всех личных слотов',
+        tags=['For specialist'],
+        responses={
+             200: OpenApiResponse(
+                 response=SlotSerializer,
+                 description='Успешный запрос',
+                 examples=[
+                     OpenApiExample(
+                         'Успешный запрос',
+                         value={"date": "2024-08-30",
+                                "start_time": "10:00:00",
+                                "end_time": "11:00:00",
+                                "context": "",
+                                "is_available": True,
+                                "duration": "1h 0m"
+                                }
+                     )
+                 ]
+             ),
+        }
+        )
+)
+class SpecialistSlotListView(ListAPIView):
+    serializer_class = SpecialistSlotListSerializer
+    permission_classes = [IsSpecialistUser]
+
+    def get_queryset(self):
+        return Slot.objects.filter(specialist=self.request.user)

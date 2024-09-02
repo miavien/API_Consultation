@@ -6,4 +6,5 @@ urlpatterns = [
     path('block_user/', BlockUserAPIView.as_view(), name='block-user'),
     path('unblock_user/', UnblockUserAPIView.as_view(), name='unblock-user'),
     path('create_slot/', CreateSlotAPIView.as_view(), name='create-slot'),
+    path('specialist_slots/', SpecialistSlotListView.as_view(), name='specialist-slots'),
 ]
