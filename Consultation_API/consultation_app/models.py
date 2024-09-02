@@ -52,7 +52,7 @@ class Consultation(models.Model):
         ('Rejected', 'Отклонён'),
     ]
 
-    slot = models.OneToOneField(Slot, on_delete=models.CASCADE, related_name='consultations', verbose_name='Слот')
+    slot = models.ForeignKey(Slot, on_delete=models.CASCADE, related_name='consultations', verbose_name='Слот')
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='consultations', verbose_name='Клиент')
     is_canceled = models.BooleanField(default=False, verbose_name='Отменен')
     cancel_comment = models.CharField(max_length=255, blank=True, verbose_name='Комментарий при отмене')

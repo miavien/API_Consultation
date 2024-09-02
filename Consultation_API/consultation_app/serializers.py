@@ -80,7 +80,7 @@ class SpecialistSlotListSerializer(serializers.ModelSerializer):
 
 class ClientSlotListSerializer(serializers.ModelSerializer):
     duration = serializers.SerializerMethodField()
-    specialist_username = serializers.SerializerMethodField()
+    specialist_username = serializers.CharField(source='specialist.username')
 
     class Meta:
         model = Slot
@@ -98,16 +98,13 @@ class ClientSlotListSerializer(serializers.ModelSerializer):
 
         return f'{int(hours)}h {int(minutes)}m'
 
-    def get_specialist_username(self, obj):
-        return obj.specialist.username
-
 
 class ConsultationSerializer(serializers.ModelSerializer):
     slot_id = serializers.IntegerField(write_only=True)
-    specialist_username = serializers.SerializerMethodField()
-    date = serializers.SerializerMethodField()
-    start_time = serializers.SerializerMethodField()
-    end_time = serializers.SerializerMethodField()
+    specialist_username = serializers.CharField(source='slot.specialist.username', read_only=True)
+    date = serializers.DateField(source='slot.date', read_only=True)
+    start_time = serializers.TimeField(source='slot.start_time', read_only=True)
+    end_time = serializers.TimeField(source='slot.end_time', read_only=True)
     status_display = serializers.SerializerMethodField()
     class Meta:
         model = Consultation
@@ -121,17 +118,19 @@ class ConsultationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Слота с таким id не существует')
         return value
 
-    def get_specialist_username(self, obj):
-        return obj.slot.specialist.username
+    def get_status_display(self, obj):
+        return obj.get_status_display()
 
-    def get_date(self, obj):
-        return obj.slot.date
+class SpecialistConsultationListSerializer(serializers.ModelSerializer):
+    date = serializers.DateField(source='slot.date', read_only=True)
+    start_time = serializers.TimeField(source='slot.start_time', read_only=True)
+    end_time = serializers.TimeField(source='slot.end_time', read_only=True)
+    client_username = serializers.CharField(source='client.username', read_only=True)
+    status_display = serializers.SerializerMethodField()
 
-    def get_start_time(self, obj):
-        return obj.slot.start_time
-
-    def get_end_time(self, obj):
-        return obj.slot.end_time
+    class Meta:
+        model = Consultation
+        fields = ['id', 'client_username', 'date', 'start_time', 'end_time', 'status_display']
 
     def get_status_display(self, obj):
         return obj.get_status_display()

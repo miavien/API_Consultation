@@ -365,6 +365,10 @@ class ClientConsultationAPIView(APIView):
                     OpenApiExample(
                         'Некорректный id слота',
                         value={'detail': 'Слота с таким id не существует'}
+                    ),
+                    OpenApiExample(
+                        'Повторный запрос',
+                        value={'message': 'Вы уже отправили запрос на консультацию на эту дату'}
                     )
                 ]
             )
@@ -386,6 +390,9 @@ class ClientConsultationAPIView(APIView):
             if Consultation.objects.filter(slot_id=slot_id, status='Accepted').exists():
                 return Response({'message': 'Для данного слота уже существует подтверждённая консультация'})
 
+            if Consultation.objects.filter(slot_id=slot_id, client=request.user):
+                return Response({'message': 'Вы уже отправили запрос на консультацию на эту дату'})
+
             slot = Slot.objects.get(pk=slot_id)
             consultation_data = {
                 'slot': slot,
@@ -393,7 +400,42 @@ class ClientConsultationAPIView(APIView):
             }
             consultation = Consultation.objects.create(**consultation_data)
             consultation_serializer = ConsultationSerializer(consultation)
-            return Response({'message': 'Запрос на консультацию успешно отправлен', 'data': consultation_serializer.data},
-                            status=status.HTTP_200_OK)
+            return Response(
+                {'message': 'Запрос на консультацию успешно отправлен', 'data': consultation_serializer.data},
+                status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary='Получение всех консультаций',
+        description='Получение специалистом всех личных консультаций',
+        tags=['For specialist'],
+        responses={
+            200: OpenApiResponse(
+                response=SlotSerializer,
+                description='Успешный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Успешный запрос',
+                        value={"id": 12,
+                               "client_username": "client1",
+                               "date": "2024-09-03",
+                               "start_time": "13:00:00",
+                               "end_time": "14:30:00",
+                               "status_display": "Ожидает"
+                               }
+                    )
+                ]
+            ),
+        }
+    )
+)
+class SpecialistConsultationListView(ListAPIView):
+    serializer_class = SpecialistConsultationListSerializer
+    permission_classes = [IsSpecialistUser]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Consultation.objects.filter(slot__specialist=user)

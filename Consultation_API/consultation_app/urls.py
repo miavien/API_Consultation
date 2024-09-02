@@ -9,4 +9,5 @@ urlpatterns = [
     path('specialist_slots/', SpecialistSlotListView.as_view(), name='specialist-slots'),
     path('client_slots/', ClientSlotListView.as_view(), name='client-slots'),
     path('create_consultation/', ClientConsultationAPIView.as_view(), name='create-consultation'),
+    path('specialist_consultations/', SpecialistConsultationListView.as_view(), name='specialist-consultations')
 ]
