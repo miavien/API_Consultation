@@ -205,7 +205,7 @@ class CreateSlotAPIView(APIView):
                         'Успешный запрос',
                         value={'message': 'Слот успешно создан',
                                'data': {
-                                   'date': '2024-08-30',
+                                   'date': '2024-09-05',
                                    'start_time': '13:00',
                                    'end_time': '13:30',
                                    'context': 'Доп. информация'
@@ -233,7 +233,7 @@ class CreateSlotAPIView(APIView):
             OpenApiExample(
                 'Пример запроса',
                 description='Пример запроса',
-                value={'date': '2024-08-30',
+                value={'date': '2024-09-05',
                        'start_time': '13:00',
                        'end_time': '13:30',
                        'context': 'Some context here'},
@@ -265,24 +265,24 @@ class CreateSlotAPIView(APIView):
         description='Получение специалистом всех личных слотов',
         tags=['For specialist'],
         responses={
-             200: OpenApiResponse(
-                 response=SlotSerializer,
-                 description='Успешный запрос',
-                 examples=[
-                     OpenApiExample(
-                         'Успешный запрос',
-                         value={"date": "2024-08-30",
-                                "start_time": "10:00:00",
-                                "end_time": "11:00:00",
-                                "context": "",
-                                "is_available": True,
-                                "duration": "1h 0m"
-                                }
-                     )
-                 ]
-             ),
+            200: OpenApiResponse(
+                response=SlotSerializer,
+                description='Успешный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Успешный запрос',
+                        value={"date": "2024-08-30",
+                               "start_time": "10:00:00",
+                               "end_time": "11:00:00",
+                               "context": "",
+                               "is_available": True,
+                               "duration": "1h 0m"
+                               }
+                    )
+                ]
+            ),
         }
-        )
+    )
 )
 class SpecialistSlotListView(ListAPIView):
     serializer_class = SpecialistSlotListSerializer
@@ -290,3 +290,110 @@ class SpecialistSlotListView(ListAPIView):
 
     def get_queryset(self):
         return Slot.objects.filter(specialist=self.request.user)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary='Получение всех слотов',
+        description='Получение клиентом всех доступных для записи слотов',
+        tags=['For client'],
+        responses={
+            200: OpenApiResponse(
+                response=SlotSerializer,
+                description='Успешный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Успешный запрос',
+                        value={"id": 14,
+                               "specialist_username": "user1",
+                               "date": "2024-09-03",
+                               "start_time": "13:00:00",
+                               "end_time": "14:30:00",
+                               "context": "Платная услуга",
+                               "duration": "1h 30m"
+                               }
+                    )
+                ]
+            ),
+        }
+    )
+)
+class ClientSlotListView(ListAPIView):
+    serializer_class = ClientSlotListSerializer
+    permission_classes = [IsClientUser]
+
+    def get_queryset(self):
+        return Slot.objects.filter(is_available=True)
+
+
+class ClientConsultationAPIView(APIView):
+    permission_classes = [IsClientUser]
+    serializer_class = ConsultationSerializer
+
+    @extend_schema(
+        summary='Создание запроса на консультацию',
+        description='Метод для создания клиентом запроса на консультацию по id свободного слота',
+        request=ConsultationSerializer,
+        responses={
+            200: OpenApiResponse(
+                response=ConsultationSerializer,
+                description='Успешный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Успешный запрос',
+                        value={
+                            "message": "Запрос на консультацию успешно отправлен",
+                            "data": {
+                                "specialist_username": "user1",
+                                "date": "2024-09-03",
+                                "start_time": "13:00:00",
+                                "end_time": "14:30:00",
+                                "status_display": "Ожидает"
+                            }
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=ConsultationSerializer,
+                description='Неверный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Слот занят',
+                        value={'message': 'Для данного слота уже существует подтверждённая консультация'}
+                    ),
+                    OpenApiExample(
+                        'Некорректный id слота',
+                        value={'detail': 'Слота с таким id не существует'}
+                    )
+                ]
+            )
+        },
+        examples=[
+            OpenApiExample(
+                'Пример запроса',
+                description='Пример запроса',
+                value={'slot_id': 1},
+                status_codes=[str(status.HTTP_202_ACCEPTED)],
+            )
+        ],
+        tags=['For client']
+    )
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            slot_id = serializer.validated_data['slot_id']
+            if Consultation.objects.filter(slot_id=slot_id, status='Accepted').exists():
+                return Response({'message': 'Для данного слота уже существует подтверждённая консультация'})
+
+            slot = Slot.objects.get(pk=slot_id)
+            consultation_data = {
+                'slot': slot,
+                'client': request.user
+            }
+            consultation = Consultation.objects.create(**consultation_data)
+            consultation_serializer = ConsultationSerializer(consultation)
+            return Response({'message': 'Запрос на консультацию успешно отправлен', 'data': consultation_serializer.data},
+                            status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

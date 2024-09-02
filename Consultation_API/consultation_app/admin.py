@@ -24,3 +24,13 @@ class UserAdmin(UserAdmin):
     ordering = ('username',)
 
 admin.site.register(User, UserAdmin)
+
+@admin.register(Slot)
+class SlotAdmin(admin.ModelAdmin):
+    list_display = ['specialist', 'date', 'start_time', 'end_time']
+    list_display_links = ['specialist']
+
+@admin.register(Consultation)
+class ConsultationAdmin(admin.ModelAdmin):
+    list_display = ['slot', 'client', 'is_canceled', 'status']
+    list_display_links = ['slot']
