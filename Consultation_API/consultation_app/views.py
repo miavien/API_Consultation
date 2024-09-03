@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
@@ -323,7 +324,11 @@ class ClientSlotListView(ListAPIView):
     permission_classes = [IsClientUser]
 
     def get_queryset(self):
-        return Slot.objects.filter(is_available=True)
+        now = timezone.now()
+        # фильтруем, чтобы либо дата была больше сегодняшней, либо сегодня, но время старта больше текущего времени
+        return Slot.objects.filter(
+            Q(is_available=True) & (Q(date__gt=now.date()) | Q(date=now.date(), start_time__gte=now.time()))
+        )
 
 
 class ClientConsultationAPIView(APIView):
@@ -369,6 +374,10 @@ class ClientConsultationAPIView(APIView):
                     OpenApiExample(
                         'Повторный запрос',
                         value={'message': 'Вы уже отправили запрос на консультацию на эту дату'}
+                    ),
+                    OpenApiExample(
+                        'Некорректное время',
+                        value={'message': 'Дата и время консультации не могут быть ранее текущего времени'}
                     )
                 ]
             )
@@ -388,12 +397,20 @@ class ClientConsultationAPIView(APIView):
         if serializer.is_valid():
             slot_id = serializer.validated_data['slot_id']
             if Consultation.objects.filter(slot_id=slot_id, status='Accepted').exists():
-                return Response({'message': 'Для данного слота уже существует подтверждённая консультация'})
+                return Response({'message': 'Для данного слота уже существует подтверждённая консультация'},
+                                status=status.HTTP_400_BAD_REQUEST)
 
             if Consultation.objects.filter(slot_id=slot_id, client=request.user):
-                return Response({'message': 'Вы уже отправили запрос на консультацию на эту дату'})
+                return Response({'message': 'Вы уже отправили запрос на консультацию на эту дату'},
+                                status=status.HTTP_400_BAD_REQUEST)
 
+            now = datetime.now()
             slot = Slot.objects.get(pk=slot_id)
+            slot_time = datetime.combine(slot.date, slot.start_time)
+            if slot_time < now:
+                return Response({'message': 'Дата и время консультации не могут быть ранее текущего времени'},
+                                status=status.HTTP_400_BAD_REQUEST)
+
             consultation_data = {
                 'slot': slot,
                 'client': request.user
@@ -439,3 +456,60 @@ class SpecialistConsultationListView(ListAPIView):
     def get_queryset(self):
         user = self.request.user
         return Consultation.objects.filter(slot__specialist=user)
+
+
+class UpdateStatusConsultationAPIView(APIView):
+    permission_classes = [IsSpecialistUser]
+    serializer_class = UpdateStatusConsultationSerializer
+
+    @extend_schema(
+        summary='Обновление статуса консультации',
+        description='Метод для изменения специалистом статуса консультации на один из вариантов: Accepted/Rejected',
+        request=UpdateStatusConsultationSerializer,
+        responses={
+            200: OpenApiResponse(
+                response=UpdateStatusConsultationSerializer,
+                description='Успешный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Успешный запрос',
+                        value={
+                            "message": "Статус консультации обновлён",
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=UpdateStatusConsultationSerializer,
+                description='Неверный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Неверный статус',
+                        value={'detail': 'Некорректный статус'}
+                    ),
+                    OpenApiExample(
+                        'Некорректный id консультации',
+                        value={'detail': 'Консультации с таким id не существует'}
+                    )
+                ]
+            )
+        },
+        examples=[
+            OpenApiExample(
+                'Пример запроса',
+                description='Пример запроса',
+                value={'consultation_id': 1,
+                       'status': 'Accepted'},
+                status_codes=[str(status.HTTP_202_ACCEPTED)],
+            )
+        ],
+        tags=['For specialist']
+    )
+    def patch(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            consultation_id = serializer.validated_data['consultation_id']
+            consultation = Consultation.objects.get(id=consultation_id)
+            serializer.update(consultation, serializer.validated_data)
+            return Response({'message': 'Статус консультации обновлён'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

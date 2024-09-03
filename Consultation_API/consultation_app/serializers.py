@@ -106,6 +106,7 @@ class ConsultationSerializer(serializers.ModelSerializer):
     start_time = serializers.TimeField(source='slot.start_time', read_only=True)
     end_time = serializers.TimeField(source='slot.end_time', read_only=True)
     status_display = serializers.SerializerMethodField()
+
     class Meta:
         model = Consultation
         fields = ['slot_id', 'specialist_username', 'date', 'start_time',
@@ -121,6 +122,7 @@ class ConsultationSerializer(serializers.ModelSerializer):
     def get_status_display(self, obj):
         return obj.get_status_display()
 
+
 class SpecialistConsultationListSerializer(serializers.ModelSerializer):
     date = serializers.DateField(source='slot.date', read_only=True)
     start_time = serializers.TimeField(source='slot.start_time', read_only=True)
@@ -134,3 +136,36 @@ class SpecialistConsultationListSerializer(serializers.ModelSerializer):
 
     def get_status_display(self, obj):
         return obj.get_status_display()
+
+
+class UpdateStatusConsultationSerializer(serializers.ModelSerializer):
+    consultation_id = serializers.IntegerField()
+    status = serializers.ChoiceField(choices=Consultation.STATUS_CHOICE)
+
+    class Meta:
+        model = Consultation
+        fields = ['consultation_id', 'status']
+
+    def validate_status(self, value):
+        if value not in dict(Consultation.STATUS_CHOICE).keys():
+            raise serializers.ValidationError('Некорректный статус')
+        return value
+
+    def validate_consultation_id(self, value):
+        if not Consultation.objects.filter(id=value).exists():
+            raise serializers.ValidationError('Консультации с таким id не существует')
+        return value
+
+    def update(self, instance, validated_data):
+        status = validated_data.get('status', instance.status)
+
+        if status == 'Accepted':
+            slot = instance.slot
+            slot.is_available = False
+            slot.save()
+
+            Consultation.objects.filter(slot=slot).exclude(id=instance.id).update(status='Rejected')
+
+        instance.status = status
+        instance.save()
+        return instance

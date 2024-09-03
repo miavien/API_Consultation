@@ -27,7 +27,7 @@ admin.site.register(User, UserAdmin)
 
 @admin.register(Slot)
 class SlotAdmin(admin.ModelAdmin):
-    list_display = ['specialist', 'date', 'start_time', 'end_time']
+    list_display = ['id', 'specialist', 'date', 'start_time', 'end_time']
     list_display_links = ['specialist']
 
 @admin.register(Consultation)
