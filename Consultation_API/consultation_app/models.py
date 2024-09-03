@@ -28,11 +28,11 @@ class User(AbstractUser):
 
 class Slot(models.Model):
     specialist = models.ForeignKey(User, on_delete=models.CASCADE, related_name='slots', verbose_name='Специалист')
-    date = models.DateField(verbose_name='Дата')
-    start_time = models.TimeField(verbose_name='Начало')
-    end_time = models.TimeField(verbose_name='Окончание')
+    date = models.DateField(verbose_name='Дата', db_index=True)
+    start_time = models.TimeField(verbose_name='Начало', db_index=True)
+    end_time = models.TimeField(verbose_name='Окончание', db_index=True)
     context = models.CharField(max_length=255, blank=True, null=True, verbose_name='Контекст')
-    is_available = models.BooleanField(default=True, verbose_name='Доступно')
+    is_available = models.BooleanField(default=True, verbose_name='Доступно', db_index=True)
 
     def __str__(self):
         return f'{self.specialist} {self.date} {self.start_time} - {self.end_time}'
@@ -59,7 +59,7 @@ class Consultation(models.Model):
     cancel_reason_choice = models.CharField(max_length=50, choices=CANCEL_CHOICE, blank=True,
                                             verbose_name='Причина отмены из списка')
     is_completed = models.BooleanField(default=False, verbose_name='Завершен')
-    status = models.CharField(max_length=15, choices=STATUS_CHOICE, default='Pending', verbose_name='Статус')
+    status = models.CharField(max_length=15, choices=STATUS_CHOICE, default='Pending', verbose_name='Статус', db_index=True)
 
     def __str__(self):
         return f'Specialist: {self.slot.specialist.username}, client: {self.client.username}'
