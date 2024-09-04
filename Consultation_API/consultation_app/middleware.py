@@ -8,6 +8,6 @@ class BlockedUserMiddleware:
     def __call__(self, request, *args, **kwargs):
         user = request.user
         if user.is_authenticated and user.is_blocked:
-            return JsonResponse({'error': 'Your account is blocked'}, status=403)
+            return JsonResponse({'error': 'Ваш аккаунт заблокирован'}, status=403)
         response = self.get_response(request)
         return response

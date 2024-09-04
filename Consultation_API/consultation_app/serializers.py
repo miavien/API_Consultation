@@ -138,6 +138,20 @@ class SpecialistConsultationListSerializer(serializers.ModelSerializer):
         return obj.get_status_display()
 
 
+class ClientConsultationListSerializer(serializers.ModelSerializer):
+    date = serializers.DateField(source='slot.date', read_only=True)
+    start_time = serializers.TimeField(source='slot.start_time', read_only=True)
+    end_time = serializers.TimeField(source='slot.end_time', read_only=True)
+    specialist_username = serializers.CharField(source='slot.specialist.username', read_only=True)
+    status_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultation
+        fields = ['id', 'specialist_username', 'date', 'start_time', 'end_time', 'status_display']
+
+    def get_status_display(self, obj):
+        return obj.get_status_display()
+
 class UpdateStatusConsultationSerializer(serializers.ModelSerializer):
     consultation_id = serializers.IntegerField()
     status = serializers.ChoiceField(choices=Consultation.STATUS_CHOICE)

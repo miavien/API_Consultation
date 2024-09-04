@@ -458,6 +458,41 @@ class SpecialistConsultationListView(ListAPIView):
         return Consultation.objects.filter(slot__specialist=user)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        summary='Получение консультаций',
+        description='Получение клиентом всех личных консультаций',
+        tags=['For client'],
+        responses={
+            200: OpenApiResponse(
+                response=SlotSerializer,
+                description='Успешный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Успешный запрос',
+                        value={
+                            "id": 15,
+                            "specialist_username": "user1",
+                            "date": "2024-09-05",
+                            "start_time": "12:00:00",
+                            "end_time": "12:30:00",
+                            "status_display": "Принят"
+                        }
+                    )
+                ]
+            ),
+        }
+    )
+)
+class ClientConsultationListView(ListAPIView):
+    serializer_class = ClientConsultationListSerializer
+    permission_classes = [IsClientUser]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Consultation.objects.filter(client=user)
+
+
 class UpdateStatusConsultationAPIView(APIView):
     permission_classes = [IsSpecialistUser]
     serializer_class = UpdateStatusConsultationSerializer
@@ -513,6 +548,7 @@ class UpdateStatusConsultationAPIView(APIView):
             serializer.update(consultation, serializer.validated_data)
             return Response({'message': 'Статус консультации обновлён'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class SlotUpdateAPIView(APIView):
     permission_classes = [IsSpecialistUser]
