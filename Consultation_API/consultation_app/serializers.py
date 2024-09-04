@@ -63,7 +63,7 @@ class SpecialistSlotListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Slot
-        fields = ['date', 'start_time', 'end_time', 'context', 'is_available', 'duration']
+        fields = ['id', 'date', 'start_time', 'end_time', 'context', 'is_available', 'duration']
 
     # метод для вычисления длительности слота
     def get_duration(self, obj):
@@ -169,3 +169,47 @@ class UpdateStatusConsultationSerializer(serializers.ModelSerializer):
         instance.status = status
         instance.save()
         return instance
+
+
+class SlotUpdateSerializer(serializers.ModelSerializer):
+    specialist_username = serializers.CharField(write_only=True, required=False)
+    class Meta:
+        model = Slot
+        fields = ['id', 'specialist_username', 'date', 'start_time', 'end_time', 'context', 'is_available']
+        read_only_fields = ['id', 'is_available', 'specialist']
+
+    def get_specialist_username(self, obj):
+        return obj.specialist.username if obj.specialist else None
+
+    def update(self, instance, validated_data):
+        specialist_username = validated_data.pop('specialist_username', None)
+        new_specialist = instance.specialist
+
+        if specialist_username:
+            try:
+                new_specialist = User.objects.get(username=specialist_username)
+            except User.DoesNotExist:
+                raise serializers.ValidationError({'specialist_username': 'Специалист с таким юзернеймом не найден'})
+
+        self._validate_slot_time(new_specialist, validated_data, instance)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance
+
+    def _validate_slot_time(self, new_specialist, data, instance):
+        date = data.get('date', instance.date)
+        start_time = data.get('start_time', instance.start_time)
+        end_time = data.get('end_time', instance.end_time)
+
+        same_time_slots = Slot.objects.filter(
+            specialist=new_specialist,
+            date=date,
+            start_time__lt=end_time,
+            end_time__gt=start_time
+        ).exclude(id=instance.id)
+
+        if same_time_slots.exists():
+            raise serializers.ValidationError({'detail': 'Время слота пересекается с другим слотом специалиста'})

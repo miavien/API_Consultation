@@ -513,3 +513,75 @@ class UpdateStatusConsultationAPIView(APIView):
             serializer.update(consultation, serializer.validated_data)
             return Response({'message': 'Статус консультации обновлён'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class SlotUpdateAPIView(APIView):
+    permission_classes = [IsSpecialistUser]
+
+    @extend_schema(
+        summary='Изменение параметров слота',
+        description='Метод для изменения специалистом данных слота',
+        request=SlotUpdateSerializer,
+        responses={
+            200: OpenApiResponse(
+                response=SlotUpdateSerializer,
+                description='Успешный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Успешный запрос',
+                        value={
+                            "message": "Слот успешно обновлен",
+                            "data": {
+                                "id": 16,
+                                "date": "2024-09-05",
+                                "start_time": "12:00:00",
+                                "end_time": "12:30:00",
+                                "context": None,
+                                "is_available": True
+                            }
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=SlotUpdateSerializer,
+                description='Неверный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Некорректные данные',
+                        value={'message': 'Необходимо указать id слота'}
+                    ),
+                    OpenApiExample(
+                        'Некорректный id слота',
+                        value={'message': 'Вашего слота с таким id не существует'}
+                    )
+                ]
+            )
+        },
+        examples=[
+            OpenApiExample(
+                'Пример запроса',
+                description='Пример запроса',
+                value={"id": 1,
+                       "date": "2024-09-05",
+                       "start_time": "12:00:00",
+                       "end_time": "13:00:00"},
+                status_codes=[str(status.HTTP_202_ACCEPTED)],
+            )
+        ],
+        tags=['For specialist']
+    )
+    def patch(self, request):
+        slot_id = request.data.get('id')
+        if not slot_id:
+            return Response({'message': 'Необходимо указать id слота'}, status=status.HTTP_400_BAD_REQUEST)
+
+        slot = Slot.objects.filter(id=slot_id, specialist=request.user).first()
+
+        if not slot:
+            return Response({'message': 'Вашего слота с таким id не существует'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = SlotUpdateSerializer(slot, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Слот успешно обновлен', 'data': serializer.data}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
