@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -31,12 +33,21 @@ class Slot(models.Model):
     date = models.DateField(verbose_name='Дата', db_index=True)
     start_time = models.TimeField(verbose_name='Начало', db_index=True)
     end_time = models.TimeField(verbose_name='Окончание', db_index=True)
+    duration = models.DurationField(blank=True, null=True, verbose_name='Длительность')
     context = models.CharField(max_length=255, blank=True, null=True, verbose_name='Контекст')
     is_available = models.BooleanField(default=True, verbose_name='Доступно', db_index=True)
 
     def __str__(self):
         return f'{self.specialist} {self.date} {self.start_time} - {self.end_time}'
 
+    def save(self, *args, **kwargs):
+        if self.start_time and self.end_time:
+            start = timedelta(hours=self.start_time.hour, minutes=self.start_time.minute,
+                              seconds=self.start_time.second)
+            end = timedelta(hours=self.end_time.hour, minutes=self.end_time.minute,
+                              seconds=self.end_time.second)
+            self.duration = end - start
+        super().save(*args, **kwargs)
 
 class Consultation(models.Model):
     CANCEL_CHOICE = [

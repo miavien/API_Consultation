@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'consultation_app',
     'rest_framework',
     'drf_spectacular',
+    'rest_framework_simplejwt',
 ]
 
 MIDDLEWARE = [
@@ -142,6 +143,7 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.BasicAuthentication",
+        # 'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
 
@@ -150,7 +152,24 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API для записи на консультацию',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+
 }
+
+# SPECTACULAR_SETTINGS = {
+#     'TITLE': 'Your API',
+#     'DESCRIPTION': 'API description',
+#     'VERSION': '1.0.0',
+#     'SERVE_INCLUDE_SCHEMA': False,
+#     'SECURITY': [
+#         {
+#             'bearerAuth': [],
+#         },
+#     ],
+#     'COMPONENT_SPLIT_REQUEST': True,
+#     'CAMELIZE_NAMES': False,
+#     'RESPONSIVE_DOCS': True,
+# }
+
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
