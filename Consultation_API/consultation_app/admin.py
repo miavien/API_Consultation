@@ -29,6 +29,7 @@ admin.site.register(User, UserAdmin)
 class SlotAdmin(admin.ModelAdmin):
     list_display = ['id', 'specialist', 'date', 'start_time', 'end_time', 'duration']
     list_display_links = ['specialist']
+    exclude = ('duration',)
 
 @admin.register(Consultation)
 class ConsultationAdmin(admin.ModelAdmin):

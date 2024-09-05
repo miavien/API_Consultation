@@ -3,6 +3,7 @@ from .views import *
 
 urlpatterns = [
     path('login/', LoginAPIView.as_view(), name='login-api'),
+    path('registration/', UserRegistrationAPIView.as_view(), name='registration-api'),
     path('block_user/', BlockUserAPIView.as_view(), name='block-user'),
     path('unblock_user/', UnblockUserAPIView.as_view(), name='unblock-user'),
     path('create_slot/', CreateSlotAPIView.as_view(), name='create-slot'),
@@ -13,4 +14,5 @@ urlpatterns = [
     path('client_consultations/', ClientConsultationListView.as_view(), name='client-consultations'),
     path('update_status/', UpdateStatusConsultationAPIView.as_view(), name='update-status'),
     path('update_slot/', SlotUpdateAPIView.as_view(), name='update-slot'),
+    path('cancel_consultation/', CancelConsultationAPIView.as_view(), name='cancel-consultation'),
 ]

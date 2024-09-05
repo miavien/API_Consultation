@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers
 from datetime import datetime
@@ -7,6 +8,28 @@ from .models import *
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
+
+
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    password_confirm = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ['username', 'password', 'password_confirm', 'role']
+
+    def validate(self, data):
+        if data['password'] != data['password_confirm']:
+            raise serializers.ValidationError('Пароли не совпадают')
+        return data
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        validated_data.pop('password_confirm')
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
 
 
 class BlockUserSerializer(serializers.Serializer):
@@ -68,10 +91,11 @@ class ConsultationSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(source='slot.end_time', read_only=True)
     duration = serializers.DurationField(source='slot.duration', read_only=True)
     status_display = serializers.SerializerMethodField()
+    id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Consultation
-        fields = ['slot_id', 'specialist_username', 'date', 'start_time',
+        fields = ['id', 'slot_id', 'specialist_username', 'date', 'start_time',
                   'end_time', 'duration', 'status_display']
         read_only_fields = ['client', 'is_canceled', 'cancel_comment',
                             'cancel_reason_choice', 'is_completed', 'status']
@@ -94,7 +118,7 @@ class SpecialistConsultationListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultation
-        fields = ['id', 'client_username', 'date', 'start_time', 'end_time', 'status_display']
+        fields = ['id', 'client_username', 'date', 'start_time', 'end_time', 'status_display', 'is_canceled']
 
     def get_status_display(self, obj):
         return obj.get_status_display()
@@ -109,7 +133,7 @@ class ClientConsultationListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultation
-        fields = ['id', 'specialist_username', 'date', 'start_time', 'end_time', 'status_display']
+        fields = ['id', 'specialist_username', 'date', 'start_time', 'end_time', 'status_display', 'is_canceled']
 
     def get_status_display(self, obj):
         return obj.get_status_display()
@@ -191,3 +215,39 @@ class SlotUpdateSerializer(serializers.ModelSerializer):
 
         if same_time_slots.exists():
             raise serializers.ValidationError({'detail': 'Время слота пересекается с другим слотом специалиста'})
+
+
+class CancelConsultationSerializer(serializers.ModelSerializer):
+    consultation_id = serializers.IntegerField()
+    cancel_reason = serializers.ChoiceField(choices=Consultation.CANCEL_CHOICE, required=False)
+    cancel_comment = serializers.CharField(required=False, max_length=255)
+
+    class Meta:
+        model = Consultation
+        fields = ['consultation_id', 'cancel_reason', 'cancel_comment']
+
+    def validate(self, data):
+        cancel_reason = data.get('cancel_reason')
+        cancel_comment = data.get('cancel_comment')
+        if not cancel_reason and not cancel_comment:
+            raise serializers.ValidationError('Необходимо указать либо причину отмены, либо оставить комментарий')
+        return data
+
+    def validate_cancel_reason(self, value):
+        if value not in dict(Consultation.CANCEL_CHOICE).keys():
+            raise serializers.ValidationError('Некорректная причина отмены')
+        return value
+
+    def validate_consultation_id(self, value):
+        if not Consultation.objects.filter(id=value).exists():
+            raise serializers.ValidationError('Консультации с таким id не существует')
+        return value
+
+    def update(self, instance, validated_data):
+        instance.is_canceled = True
+        instance.cancel_reason_choice = validated_data.get('cancel_reason', instance.cancel_reason_choice)
+        instance.cancel_comment = validated_data.get('cancel_comment', instance.cancel_comment)
+        instance.slot.is_available = True
+        instance.slot.save()
+        instance.save()
+        return instance

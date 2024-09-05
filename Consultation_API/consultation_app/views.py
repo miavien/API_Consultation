@@ -64,6 +64,56 @@ class LoginAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class UserRegistrationAPIView(APIView):
+    @extend_schema(
+        summary='Регистрация',
+        description='Метод для регистрации пользователя. '
+                    'Обязательные поля: username, password, password_confirm, role (Specialist/Client)',
+        request=UserRegistrationSerializer,
+        responses={
+            200: OpenApiResponse(
+                response=UserRegistrationSerializer,
+                description='Авторизация успешна',
+                examples=[
+                    OpenApiExample(
+                        'Регистрация успешна',
+                        value={'message': 'Пользователь успешно зарегистрирован'})
+                ]
+            ),
+            400: OpenApiResponse(
+                response=UserRegistrationSerializer,
+                description='Ошибка регистрации',
+                examples=[
+                    OpenApiExample(
+                        'Неверный пароль',
+                        value={'message': 'Пароли не совпадают'}
+                    )
+                ]
+            )
+        },
+        examples=[
+            OpenApiExample(
+                'Пример запроса',
+                description='Пример запроса',
+                value={
+                    'username': 'user1',
+                    'password': 'password123',
+                    'password_confirm': 'password123',
+                    'role': 'Client'
+                },
+                status_codes=[str(status.HTTP_202_ACCEPTED)],
+            )
+        ],
+        tags=['For everyone']
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = UserRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response({'message': 'Пользователь успешно зарегистрирован'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class BlockUserAPIView(APIView):
     serializer_class = BlockUserSerializer
     permission_classes = [IsAdminUser]
@@ -620,4 +670,73 @@ class SlotUpdateAPIView(APIView):
         if serializer.is_valid():
             serializer.save()
             return Response({'message': 'Слот успешно обновлен', 'data': serializer.data}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CancelConsultationAPIView(APIView):
+    permission_classes = [IsClientUser]
+    serializer_class = CancelConsultationSerializer
+
+    @extend_schema(
+        summary='Отмена консультации',
+        description='Метод для отмены клиентом консультации. Необходимо указать либо cancel_comment, '
+                    'либо одну из причин в cancel_reason: Health/Personal/Found_another_specialist/Other',
+        request=CancelConsultationSerializer,
+        responses={
+            200: OpenApiResponse(
+                response=CancelConsultationSerializer,
+                description='Успешный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Успешный запрос',
+                        value={
+                            "message": "Вы отменили консультацию",
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=CancelConsultationSerializer,
+                description='Неверный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Некорректный запрос',
+                        value={'detail': 'Необходимо указать либо причину отмены, либо оставить комментарий'}
+                    ),
+                    OpenApiExample(
+                        'Некорректный id консультации',
+                        value={'detail': 'Консультации с таким id не существует'}
+                    ),
+                    OpenApiExample(
+                        'Некорректная причина',
+                        value={'detail': 'Некорректная причина отмены'}
+                    ),
+                ]
+            )
+        },
+        examples=[
+            OpenApiExample(
+                'Пример запроса',
+                description='Пример запроса',
+                value={'consultation_id': 1,
+                       'cancel_reason': 'Other',
+                       'cancel_comment': 'Передумал'},
+                status_codes=[str(status.HTTP_202_ACCEPTED)],
+            )
+        ],
+        tags=['For client']
+    )
+    def patch(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            consultation_id = serializer.validated_data['consultation_id']
+            consultation = Consultation.objects.get(id=consultation_id)
+            if consultation.client != request.user:
+                return Response(
+                    {'message': 'Вы не можете отменить эту консультацию, так как вы не являетесь её клиентом'},
+                    status=status.HTTP_403_FORBIDDEN)
+            if consultation.is_canceled == True:
+                return Response({'message': 'Вы уже отменили консультацию'}, status=status.HTTP_400_BAD_REQUEST)
+            serializer.update(consultation, serializer.validated_data)
+            return Response({'message': 'Вы отменили консультацию'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
