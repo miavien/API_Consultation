@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import *
 from .forms import *
+
+
 # Register your models here.
 class UserAdmin(UserAdmin):
     form = CustomUserChangeForm
@@ -23,13 +25,16 @@ class UserAdmin(UserAdmin):
     search_fields = ('username', 'email')
     ordering = ('username',)
 
+
 admin.site.register(User, UserAdmin)
+
 
 @admin.register(Slot)
 class SlotAdmin(admin.ModelAdmin):
     list_display = ['id', 'specialist', 'date', 'start_time', 'end_time', 'duration']
     list_display_links = ['specialist']
     exclude = ('duration',)
+
 
 @admin.register(Consultation)
 class ConsultationAdmin(admin.ModelAdmin):

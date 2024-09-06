@@ -1,5 +1,7 @@
+from datetime import datetime
+
 from django.db.models import Q
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
@@ -33,9 +35,17 @@ class LoginAPIView(APIView):
                 description='Ошибка авторизации',
                 examples=[
                     OpenApiExample(
-                        'Ошибка авторизации',
-                        value={'message': 'Неверные логин и/или пароль'}
-                    )
+                        'Неверный username',
+                        value={'message': 'Пользователя с таким username не существует'}
+                    ),
+                    OpenApiExample(
+                        'Неверный пароль',
+                        value={'message': 'Неверный пароль для этого аккаунта'}
+                    ),
+                    OpenApiExample(
+                        'Пользователь не активен',
+                        value={'message': 'Ваш аккаунт не активирован. Пожалуйста, подтвердите регистрацию'}
+                    ),
                 ]
             )
         },
@@ -57,11 +67,19 @@ class LoginAPIView(APIView):
         if serializer.is_valid():
             username = serializer.validated_data['username']
             password = serializer.validated_data['password']
+            try:
+                user = User.objects.get(username=username)
+                if not user.is_active:
+                    return Response({'message': 'Ваш аккаунт не активирован. Пожалуйста, подтвердите регистрацию'},
+                                    status=status.HTTP_403_FORBIDDEN)
+            except User.DoesNotExist:
+                return Response({'message': 'Пользователя с таким username не существует'},
+                                status=status.HTTP_400_BAD_REQUEST)
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
                 return Response({'message': 'Авторизация успешна'}, status=status.HTTP_200_OK)
-            return Response({'message': 'Неверные логин и/или пароль'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'message': 'Неверный пароль для этого аккаунта'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -115,7 +133,9 @@ class UserRegistrationAPIView(APIView):
             return Response({'message': 'Пользователь успешно зарегистрирован'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class ConfirmRegistrationAPIView(APIView):
+    @extend_schema(exclude=True)
     def get(self, request, token, *args, **kwargs):
         user = get_object_or_404(User, activation_token=token)
 
@@ -124,7 +144,7 @@ class ConfirmRegistrationAPIView(APIView):
 
         user.is_active = True
         user.save()
-        return Response({'message': 'Ваш аккаунт успешно активирован'})
+        return redirect('swagger-ui')
 
 
 class BlockUserAPIView(APIView):

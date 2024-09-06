@@ -48,9 +48,10 @@ class Slot(models.Model):
             start = timedelta(hours=self.start_time.hour, minutes=self.start_time.minute,
                               seconds=self.start_time.second)
             end = timedelta(hours=self.end_time.hour, minutes=self.end_time.minute,
-                              seconds=self.end_time.second)
+                            seconds=self.end_time.second)
             self.duration = end - start
         super().save(*args, **kwargs)
+
 
 class Consultation(models.Model):
     CANCEL_CHOICE = [
@@ -73,7 +74,8 @@ class Consultation(models.Model):
     cancel_reason_choice = models.CharField(max_length=50, choices=CANCEL_CHOICE, blank=True,
                                             verbose_name='Причина отмены из списка')
     is_completed = models.BooleanField(default=False, verbose_name='Завершен')
-    status = models.CharField(max_length=15, choices=STATUS_CHOICE, default='Pending', verbose_name='Статус', db_index=True)
+    status = models.CharField(max_length=15, choices=STATUS_CHOICE, default='Pending', verbose_name='Статус',
+                              db_index=True)
 
     def __str__(self):
         return f'Specialist: {self.slot.specialist.username}, client: {self.client.username}'
