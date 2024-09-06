@@ -13,10 +13,11 @@ class LoginSerializer(serializers.Serializer):
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     password_confirm = serializers.CharField(write_only=True)
+    email = serializers.EmailField(required=True)
 
     class Meta:
         model = User
-        fields = ['username', 'password', 'password_confirm', 'role']
+        fields = ['username', 'password', 'password_confirm', 'email', 'role']
 
     def validate(self, data):
         if data['password'] != data['password_confirm']:
