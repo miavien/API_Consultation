@@ -24,4 +24,5 @@ urlpatterns = [
     path('api/', include('consultation_app.urls')),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('confirm/<str:token>/', ConfirmRegistrationAPIView.as_view(), name='confirm-registration'),
 ]

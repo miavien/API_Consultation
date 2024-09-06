@@ -15,11 +15,11 @@ class UserAdmin(UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'email', 'password1', 'password2', 'role', 'is_blocked'),
+            'fields': ('username', 'email', 'password1', 'password2', 'role'),
         }),
     )
     readonly_fields = ['password']
-    list_display = ('username', 'role', 'is_blocked')
+    list_display = ('username', 'role', 'is_blocked', 'is_active')
     search_fields = ('username', 'email')
     ordering = ('username',)
 

@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
@@ -73,7 +74,7 @@ class UserRegistrationAPIView(APIView):
         responses={
             200: OpenApiResponse(
                 response=UserRegistrationSerializer,
-                description='Авторизация успешна',
+                description='Регистрация успешна',
                 examples=[
                     OpenApiExample(
                         'Регистрация успешна',
@@ -97,6 +98,7 @@ class UserRegistrationAPIView(APIView):
                 description='Пример запроса',
                 value={
                     'username': 'user1',
+                    'email': 'my_email@mail.ru',
                     'password': 'password123',
                     'password_confirm': 'password123',
                     'role': 'Client'
@@ -112,6 +114,17 @@ class UserRegistrationAPIView(APIView):
             user = serializer.save()
             return Response({'message': 'Пользователь успешно зарегистрирован'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ConfirmRegistrationAPIView(APIView):
+    def get(self, request, token, *args, **kwargs):
+        user = get_object_or_404(User, activation_token=token)
+
+        if user.is_active:
+            return Response({'message': 'Ваш аккаунт уже активирован'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.is_active = True
+        user.save()
+        return Response({'message': 'Ваш аккаунт успешно активирован'})
 
 
 class BlockUserAPIView(APIView):

@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser
@@ -14,6 +15,8 @@ class User(AbstractUser):
 
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, verbose_name='Роль')
     is_blocked = models.BooleanField(default=False, verbose_name='Заблокирован')
+    is_active = models.BooleanField(default=False)
+    activation_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
     def __str__(self):
         return self.username

@@ -29,6 +29,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         validated_data.pop('password_confirm')
         user = User(**validated_data)
         user.set_password(password)
+        user.activation_token = uuid.uuid4()
         user.save()
         return user
 
