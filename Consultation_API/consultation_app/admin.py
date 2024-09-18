@@ -21,7 +21,7 @@ class UserAdmin(UserAdmin):
         }),
     )
     readonly_fields = ['password']
-    list_display = ('username', 'role', 'is_blocked', 'is_active')
+    list_display = ('username', 'email', 'role', 'is_blocked', 'is_active')
     search_fields = ('username', 'email')
     ordering = ('username',)
 

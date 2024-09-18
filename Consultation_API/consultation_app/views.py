@@ -96,7 +96,7 @@ class UserRegistrationAPIView(APIView):
                 examples=[
                     OpenApiExample(
                         'Регистрация успешна',
-                        value={'message': 'Пользователь успешно зарегистрирован'})
+                        value={'message': 'Для подтверждения регистрации на указанную почту отправлено письмо'})
                 ]
             ),
             400: OpenApiResponse(
@@ -130,7 +130,7 @@ class UserRegistrationAPIView(APIView):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            return Response({'message': 'Пользователь успешно зарегистрирован'}, status=status.HTTP_200_OK)
+            return Response({'message': 'Для подтверждения регистрации на указанную почту отправлено письмо'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

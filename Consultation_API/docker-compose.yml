@@ -51,20 +51,5 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
 
-  celery_beat:
-    build: .
-    command: celery -A Consultation_API beat --loglevel=info
-    volumes:
-      - .:/app
-    depends_on:
-      - web
-      - redis
-    env_file:
-      - .env
-    environment:
-      - DJANGO_SETTINGS_MODULE=Consultation_API.settings
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-
 volumes:
   postgres_data:

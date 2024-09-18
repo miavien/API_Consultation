@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 from .models import *
+from .tasks import send_accepted_status_email
 
 
 class LoginSerializer(serializers.Serializer):
@@ -166,9 +167,10 @@ class UpdateStatusConsultationSerializer(serializers.ModelSerializer):
             slot.save()
 
             Consultation.objects.filter(slot=slot).exclude(id=instance.id).update(status='Rejected')
+            send_accepted_status_email.delay(instance.id)
 
         instance.status = status
-        instance.save()
+        instance.save(update_fields=['status'])
         return instance
 
 
