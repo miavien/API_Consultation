@@ -1,3 +1,5 @@
+from datetime import timezone
+from django.utils import timezone
 from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
@@ -20,6 +22,7 @@ def send_confirmation_email(user_id):
         recipient_list=[user.email]
     )
 
+
 @shared_task
 def send_accepted_status_email(consultation_id):
     consultation = Consultation.objects.get(id=consultation_id)
@@ -27,6 +30,18 @@ def send_accepted_status_email(consultation_id):
     send_mail(
         subject='Изменение статуса консультации',
         message='Здравствуйте!\n\nСпециалист подтвердил вашу консультацию.',
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email]
+    )
+
+
+@shared_task
+def send_rejected_status_email(consultation_id):
+    consultation = Consultation.objects.get(id=consultation_id)
+    user = consultation.client
+    send_mail(
+        subject='Изменение статуса консультации',
+        message='Здравствуйте!\n\nСпециалист отклонил ваш запрос на консультацию.',
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email]
     )
