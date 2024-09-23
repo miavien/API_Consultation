@@ -42,7 +42,7 @@ class SlotSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Slot
-        fields = ['date', 'start_time', 'end_time', 'duration', 'context']
+        fields = ['id', 'date', 'start_time', 'end_time', 'duration', 'context']
 
     def validate(self, data):
         if data['end_time'] <= data['start_time']:

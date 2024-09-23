@@ -105,7 +105,7 @@ class UserRegistrationAPIView(APIView):
                 examples=[
                     OpenApiExample(
                         'Неверный пароль',
-                        value={'message': 'Пароли не совпадают'}
+                        value={'non_field_errors': ['Пароли не совпадают']}
                     )
                 ]
             )
@@ -290,6 +290,7 @@ class CreateSlotAPIView(APIView):
                         'Успешный запрос',
                         value={"message": "Слот успешно создан",
                                "data": {
+                                   "id": 17,
                                    "date": "2024-09-22",
                                    "start_time": "13:00:00",
                                    "end_time": "13:30:00",
