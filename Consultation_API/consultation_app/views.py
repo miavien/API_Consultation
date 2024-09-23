@@ -130,7 +130,8 @@ class UserRegistrationAPIView(APIView):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            return Response({'message': 'Для подтверждения регистрации на указанную почту отправлено письмо'}, status=status.HTTP_200_OK)
+            return Response({'message': 'Для подтверждения регистрации на указанную почту отправлено письмо'},
+                            status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -287,12 +288,13 @@ class CreateSlotAPIView(APIView):
                 examples=[
                     OpenApiExample(
                         'Успешный запрос',
-                        value={'message': 'Слот успешно создан',
-                               'data': {
-                                   'date': '2024-09-05',
-                                   'start_time': '13:00',
-                                   'end_time': '13:30',
-                                   'context': 'Доп. информация'
+                        value={"message": "Слот успешно создан",
+                               "data": {
+                                   "date": "2024-09-22",
+                                   "start_time": "13:00:00",
+                                   "end_time": "13:30:00",
+                                   "duration": "00:30:00",
+                                   "context": "Some context here"
                                }
                                }
                     )
@@ -355,13 +357,15 @@ class CreateSlotAPIView(APIView):
                 examples=[
                     OpenApiExample(
                         'Успешный запрос',
-                        value={"date": "2024-08-30",
-                               "start_time": "10:00:00",
-                               "end_time": "11:00:00",
-                               "context": "",
-                               "is_available": True,
-                               "duration": "1h 0m"
-                               }
+                        value=
+                        {"id": 10,
+                         "date": "2024-09-22",
+                         "start_time": "13:00:00",
+                         "end_time": "13:30:00",
+                         "duration": "00:30:00",
+                         "context": "Some context here",
+                         "is_available": True
+                         }
                     )
                 ]
             ),
@@ -388,13 +392,13 @@ class SpecialistSlotListView(ListAPIView):
                 examples=[
                     OpenApiExample(
                         'Успешный запрос',
-                        value={"id": 14,
-                               "specialist_username": "user1",
-                               "date": "2024-09-03",
-                               "start_time": "13:00:00",
-                               "end_time": "14:30:00",
-                               "context": "Платная услуга",
-                               "duration": "1h 30m"
+                        value={"id": 10,
+                               "specialist_username": "user3",
+                               "date": "2024-09-23",
+                               "start_time": "12:00:00",
+                               "end_time": "13:00:00",
+                               "duration": "01:00:00",
+                               "context": "Some context here"
                                }
                     )
                 ]
@@ -432,10 +436,12 @@ class ClientConsultationAPIView(APIView):
                         value={
                             "message": "Запрос на консультацию успешно отправлен",
                             "data": {
-                                "specialist_username": "user1",
-                                "date": "2024-09-03",
-                                "start_time": "13:00:00",
-                                "end_time": "14:30:00",
+                                "id": 4,
+                                "specialist_username": "user3",
+                                "date": "2024-09-23",
+                                "start_time": "12:00:00",
+                                "end_time": "13:00:00",
+                                "duration": "01:00:00",
                                 "status_display": "Ожидает"
                             }
                         }
@@ -524,7 +530,9 @@ class ClientConsultationAPIView(APIView):
                                "date": "2024-09-03",
                                "start_time": "13:00:00",
                                "end_time": "14:30:00",
-                               "status_display": "Ожидает"
+                               "status_display": "Ожидает",
+                               "is_canceled": False,
+                               "is_completed": False
                                }
                     )
                 ]
@@ -554,12 +562,13 @@ class SpecialistConsultationListView(ListAPIView):
                     OpenApiExample(
                         'Успешный запрос',
                         value={
-                            "id": 15,
-                            "specialist_username": "user1",
-                            "date": "2024-09-05",
-                            "start_time": "12:00:00",
-                            "end_time": "12:30:00",
-                            "status_display": "Принят"
+                            "id": 1,
+                            "specialist_username": "user3",
+                            "date": "2024-09-20",
+                            "start_time": "13:00:00",
+                            "end_time": "13:30:00",
+                            "status_display": "Отклонён",
+                            "is_canceled": False
                         }
                     )
                 ]
@@ -648,16 +657,16 @@ class SlotUpdateAPIView(APIView):
                     OpenApiExample(
                         'Успешный запрос',
                         value={
-                            "message": "Слот успешно обновлен",
-                            "data": {
-                                "id": 16,
-                                "date": "2024-09-05",
-                                "start_time": "12:00:00",
-                                "end_time": "12:30:00",
-                                "context": None,
-                                "is_available": True
+                                "message": "Слот успешно обновлен",
+                                "data": {
+                                    "id": 16,
+                                    "date": "2024-09-05",
+                                    "start_time": "12:00:00",
+                                    "end_time": "12:30:00",
+                                    "context": None,
+                                    "is_available": True
+                                }
                             }
-                        }
                     )
                 ]
             ),

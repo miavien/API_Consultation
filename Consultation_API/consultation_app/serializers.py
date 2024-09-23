@@ -119,7 +119,7 @@ class SpecialistConsultationListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultation
-        fields = ['id', 'client_username', 'date', 'start_time', 'end_time', 'status_display', 'is_canceled']
+        fields = ['id', 'client_username', 'date', 'start_time', 'end_time', 'status_display', 'is_canceled', 'is_completed']
 
     def get_status_display(self, obj):
         return obj.get_status_display()
