@@ -232,7 +232,7 @@ LOGGING = {
         },
         'django.db.backends': {
             'handlers': ['console', 'file'],
-            'level': 'WARNING',  # Установите уровень на WARNING
+            'level': 'WARNING',
             'propagate': False,
         },
     }
