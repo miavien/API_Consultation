@@ -63,6 +63,25 @@ def valid_slot_data():
     }
 
 
+@pytest.fixture
+def slot(valid_slot_data, user_specialist):
+    return Slot.objects.create(
+        specialist=user_specialist,
+        date=valid_slot_data['date'],
+        start_time=valid_slot_data['start_time'],
+        end_time=valid_slot_data['end_time']
+    )
+
+
+@pytest.fixture
+def consultation(slot, user_client):
+    return Consultation.objects.create(
+        slot=slot,
+        client=user_client,
+        status='Pending'
+    )
+
+
 @pytest.mark.django_db
 class TestClientConsultationAPIView:
 
@@ -147,3 +166,143 @@ class TestClientConsultationAPIView:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data['message'] == 'Вы не можете занять данный слот'
+
+@pytest.mark.django_db
+class TestClientConsultationListView:
+
+    def test_get_consultations_success(self, authenticated_api_client, consultation, slot):
+        url = reverse('client-consultations')
+        response = authenticated_api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) == 1
+        assert response.data[0]['id'] == consultation.id
+        assert response.data[0]['specialist_username'] == consultation.slot.specialist.username
+        assert response.data[0]['status_display'] == consultation.get_status_display()
+
+    def test_get_consultations_empty(self, authenticated_api_client):
+        url = reverse('client-consultations')
+        response = authenticated_api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == []
+
+    def test_get_slots_non_client(self, authenticated_api_specialist):
+        url = reverse('client-consultations')
+        response = authenticated_api_specialist.get(url)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_get_consultations_with_multiple_entries(self, authenticated_api_client, consultation, slot):
+        url = reverse('client-consultations')
+        Consultation.objects.create(slot=slot, client=consultation.client, status='Pending')
+        Consultation.objects.create(slot=slot, client=consultation.client, status='Completed')
+        response = authenticated_api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) > 1
+
+@pytest.mark.django_db
+class TestCancelConsultationAPIView:
+
+    def test_cancel_consultation_success(self, authenticated_api_client, consultation):
+        url = reverse('cancel-consultation')
+        data = {
+            'consultation_id': consultation.id,
+            'cancel_comment': 'Some reason',
+            'cancel_reason': 'Personal'
+        }
+        response = authenticated_api_client.patch(url, data)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['message'] == 'Вы отменили консультацию'
+        consultation.refresh_from_db()
+        assert consultation.is_canceled is True
+        assert consultation.cancel_comment == 'Some reason'
+        assert consultation.cancel_reason_choice == 'Personal'
+
+    def test_cancel_consultation_invalid_reason(self, authenticated_api_client, consultation):
+        url = reverse('cancel-consultation')
+        data = {
+            'consultation_id': consultation.id,
+            'cancel_comment': 'Some reason',
+            'cancel_reason': 'Invalid status'
+        }
+        response = authenticated_api_client.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'cancel_reason' in response.data
+
+    def test_cancel_consultation_invalid_data(self, authenticated_api_client, consultation):
+        url = reverse('cancel-consultation')
+        data = {
+            'consultation_id': consultation.id
+        }
+        response = authenticated_api_client.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'non_field_errors' in response.data
+        assert response.data['non_field_errors'][
+                   0] == 'Необходимо указать либо причину отмены, либо оставить комментарий'
+
+    def test_cancel_consultation_invalid_id(self, authenticated_api_client):
+        url = reverse('cancel-consultation')
+        data = {
+            'consultation_id': 9999,
+            'cancel_comment': 'Some reason',
+            'cancel_reason': 'Personal'
+        }
+
+        response = authenticated_api_client.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'consultation_id' in response.data
+        assert response.data['consultation_id'][
+                   0] == 'Консультации с таким id не существует'
+
+    def test_cancel_consultation_invalid_client(self, authenticated_api_client, api_client, consultation):
+        User = get_user_model()
+        another_user_client = User.objects.create_user(
+            username='another_client_user',
+            email='another_client@example.com',
+            password='password123'
+        )
+        another_user_client.role = 'Client'
+        another_user_client.save()
+        api_client.force_authenticate(user=another_user_client)
+        url = reverse('cancel-consultation')
+        data = {
+            'consultation_id': consultation.id,
+            'cancel_reason': 'Personal',
+        }
+
+        response = api_client.patch(url, data)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.data['message'] == 'Вы не можете отменить эту консультацию, так как вы не являетесь её клиентом'
+
+    def test_cancel_consultation_not_client(self, authenticated_api_specialist, consultation):
+        url = reverse('cancel-consultation')
+        data = {
+            'consultation_id': consultation.id,
+            'cancel_comment': 'Some reason',
+            'cancel_reason': 'Personal'
+        }
+        response = authenticated_api_specialist.patch(url, data)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_cancel_consultation_already_canceled(self, authenticated_api_client, consultation):
+        consultation.is_canceled = True
+        consultation.save()
+
+        url = reverse('cancel-consultation')
+        data = {
+            'consultation_id': consultation.id,
+            'cancel_comment': 'Some reason',
+            'cancel_reason': 'Personal'
+        }
+        response = authenticated_api_client.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data['message'] == 'Вы уже отменили консультацию'
