@@ -13,6 +13,7 @@ from .permissions import *
 
 logger = logging.getLogger(__name__)
 
+
 # Create your views here.
 class LoginAPIView(APIView):
     serializer_class = LoginSerializer
@@ -75,7 +76,7 @@ class LoginAPIView(APIView):
                     return Response({'message': 'Ваш аккаунт не активирован. Пожалуйста, подтвердите регистрацию'},
                                     status=status.HTTP_403_FORBIDDEN)
             except User.DoesNotExist:
-                logger.error('User does not exist: {username}')
+                logger.warning('User does not exist: {username}')
                 return Response({'message': 'Пользователя с таким username не существует'},
                                 status=status.HTTP_400_BAD_REQUEST)
             user = authenticate(request, username=username, password=password)
@@ -83,9 +84,9 @@ class LoginAPIView(APIView):
                 login(request, user)
                 logger.info(f'User {username} logged successfully')
                 return Response({'message': 'Авторизация успешна'}, status=status.HTTP_200_OK)
-            logger.error(f'Incorrect password attempt for user: {username}')
+            logger.warning(f'Incorrect password attempt for user: {username}')
             return Response({'message': 'Неверный пароль для этого аккаунта'}, status=status.HTTP_400_BAD_REQUEST)
-        logger.error('Invalid login data')
+        logger.warning('Invalid login data')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -136,6 +137,7 @@ class UserRegistrationAPIView(APIView):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
+            logger.info(f'User {request.data["username"]} has registered')
             return Response({'message': 'Для подтверждения регистрации на указанную почту отправлено письмо'},
                             status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -151,6 +153,7 @@ class ConfirmRegistrationAPIView(APIView):
 
         user.is_active = True
         user.save()
+        logger.info(f'User {user.username} has activated the account')
         return redirect('swagger-ui')
 
 
@@ -208,11 +211,15 @@ class BlockUserAPIView(APIView):
                 if user.is_blocked == False:
                     user.is_blocked = True
                     user.save()
+                    logger.info(f'User {user.username} has been blocked')
                     return Response({'message': 'Пользователь заблокирован'}, status=status.HTTP_200_OK)
+                logger.warning(f'User {user.username} is already blocked')
                 return Response({'message': 'Пользователь с таким id уже заблокирован'},
                                 status=status.HTTP_400_BAD_REQUEST)
             except User.DoesNotExist:
+                logger.warning(f'User with id {user_id} not exist')
                 return Response({'message': 'Пользователь с таким id не найден'}, status=status.HTTP_400_BAD_REQUEST)
+        logger.warning(f'User block request failed validation: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -270,12 +277,16 @@ class UnblockUserAPIView(APIView):
                 if user.is_blocked:
                     user.is_blocked = False
                     user.save()
+                    logger.info(f'User {user.username} has been unblocked')
                     return Response({'message': 'Пользователь разблокирован'}, status=status.HTTP_200_OK)
                 else:
+                    logger.warning(f'User {user.username} is not blocked')
                     return Response({'message': 'Пользователь с таким id не заблокирован'},
                                     status=status.HTTP_400_BAD_REQUEST)
             except User.DoesNotExist:
+                logger.warning(f'User with id {user_id} not exist')
                 return Response({'message': 'Пользователь с таким id не найден'}, status=status.HTTP_400_BAD_REQUEST)
+        logger.warning(f'User block request failed validation: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -348,7 +359,9 @@ class CreateSlotAPIView(APIView):
             }
             slot = Slot.objects.create(**slot_data)
             slot_serializer = SlotSerializer(slot)
+            logger.info(f'Slot with id = {slot.id} has been created')
             return Response({'message': 'Слот успешно создан', 'data': slot_serializer.data}, status=status.HTTP_200_OK)
+        logger.warning(f'Creating slot request failed validation: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -384,6 +397,7 @@ class SpecialistSlotListView(ListAPIView):
     permission_classes = [IsSpecialistUser]
 
     def get_queryset(self):
+        logger.info(f"User {self.request.user.username} is retrieving slots")
         return Slot.objects.filter(specialist=self.request.user)
 
 
@@ -420,6 +434,7 @@ class ClientSlotListView(ListAPIView):
     def get_queryset(self):
         now = timezone.now()
         # фильтруем, чтобы либо дата была больше сегодняшней, либо сегодня, но время старта больше текущего времени
+        logger.info(f'User {self.request.user.username} is retrieving slots')
         return Slot.objects.filter(
             Q(is_available=True) & (Q(date__gt=now.date()) | Q(date=now.date(), start_time__gte=now.time()))
         )
@@ -493,14 +508,17 @@ class ClientConsultationAPIView(APIView):
         if serializer.is_valid():
             slot_id = serializer.validated_data['slot_id']
             if Consultation.objects.filter(slot_id=slot_id, status='Accepted').exists():
+                logger.warning(f'Failed by user {request.user.username} for slot {slot_id}')
                 return Response({'message': 'Для данного слота уже существует подтверждённая консультация'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
             if Slot.objects.filter(id=slot_id, is_available=False).exists():
+                logger.warning(f'Failed by User {request.user.username} for slot {slot_id}')
                 return Response({'message': 'Вы не можете занять данный слот'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
             if Consultation.objects.filter(slot_id=slot_id, client=request.user):
+                logger.warning(f'Failed by User {request.user.username} for slot {slot_id}')
                 return Response({'message': 'Вы уже отправили запрос на консультацию на эту дату'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
@@ -508,6 +526,7 @@ class ClientConsultationAPIView(APIView):
             slot = Slot.objects.get(pk=slot_id)
             slot_time = datetime.combine(slot.date, slot.start_time)
             if slot_time < now:
+                logger.warning(f'Failed by User {request.user.username} for slot {slot_id}')
                 return Response({'message': 'Дата и время консультации не могут быть ранее текущего времени'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
@@ -517,10 +536,11 @@ class ClientConsultationAPIView(APIView):
             }
             consultation = Consultation.objects.create(**consultation_data)
             consultation_serializer = ConsultationSerializer(consultation)
+            logger.info(f'User {request.user.username} has created a consultation with id = {consultation.id}')
             return Response(
                 {'message': 'Запрос на консультацию успешно отправлен', 'data': consultation_serializer.data},
                 status=status.HTTP_200_OK)
-
+        logger.warning(f'User {request.user.username} failed to book a consultation: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -557,6 +577,7 @@ class SpecialistConsultationListView(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        logger.info(f'User {self.request.user.username} is retrieving consultations')
         return Consultation.objects.filter(slot__specialist=user)
 
 
@@ -593,6 +614,7 @@ class ClientConsultationListView(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        logger.info(f'User {self.request.user.username} is retrieving consultations')
         return Consultation.objects.filter(client=user)
 
 
@@ -649,7 +671,9 @@ class UpdateStatusConsultationAPIView(APIView):
             consultation_id = serializer.validated_data['consultation_id']
             consultation = Consultation.objects.get(id=consultation_id)
             serializer.update(consultation, serializer.validated_data)
+            logger.info(f'Consultation with id = {consultation_id} has been updated successfully')
             return Response({'message': 'Статус консультации обновлён'}, status=status.HTTP_200_OK)
+        logger.warning(f'Invalid data received for consultation update: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -668,16 +692,16 @@ class SlotUpdateAPIView(APIView):
                     OpenApiExample(
                         'Успешный запрос',
                         value={
-                                "message": "Слот успешно обновлен",
-                                "data": {
-                                    "id": 16,
-                                    "date": "2024-09-05",
-                                    "start_time": "12:00:00",
-                                    "end_time": "12:30:00",
-                                    "context": None,
-                                    "is_available": True
-                                }
+                            "message": "Слот успешно обновлен",
+                            "data": {
+                                "id": 16,
+                                "date": "2024-09-05",
+                                "start_time": "12:00:00",
+                                "end_time": "12:30:00",
+                                "context": None,
+                                "is_available": True
                             }
+                        }
                     )
                 ]
             ),
@@ -712,17 +736,21 @@ class SlotUpdateAPIView(APIView):
     def patch(self, request):
         slot_id = request.data.get('id')
         if not slot_id:
+            logger.warning(f'Invalid data received for slot update for id={slot_id}')
             return Response({'message': 'Необходимо указать id слота'}, status=status.HTTP_400_BAD_REQUEST)
 
         slot = Slot.objects.filter(id=slot_id, specialist=request.user).first()
 
         if not slot:
+            logger.warning(f'Slot with id={slot_id} is not exists')
             return Response({'message': 'Вашего слота с таким id не существует'}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = SlotUpdateSerializer(slot, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            logger.info(f'Slot with id = {slot_id} has been updated successfully')
             return Response({'message': 'Слот успешно обновлен', 'data': serializer.data}, status=status.HTTP_200_OK)
+        logger.warning(f'Invalid data received for slot update: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -785,11 +813,15 @@ class CancelConsultationAPIView(APIView):
             consultation_id = serializer.validated_data['consultation_id']
             consultation = Consultation.objects.get(id=consultation_id)
             if consultation.client != request.user:
+                logger.warning(f'Failed by user {request.user.username} to cancel consultation {consultation_id}')
                 return Response(
                     {'message': 'Вы не можете отменить эту консультацию, так как вы не являетесь её клиентом'},
                     status=status.HTTP_403_FORBIDDEN)
             if consultation.is_canceled == True:
+                logger.warning(f'Failed by user {request.user.username} to cancel consultation {consultation_id}')
                 return Response({'message': 'Вы уже отменили консультацию'}, status=status.HTTP_400_BAD_REQUEST)
             serializer.update(consultation, serializer.validated_data)
+            logger.info(f'User {request.user.username} has canceled consultation with id = {consultation_id}.')
             return Response({'message': 'Вы отменили консультацию'}, status=status.HTTP_200_OK)
+        logger.warning(f'Invalid data provided for canceling consultation: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

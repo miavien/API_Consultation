@@ -10,7 +10,7 @@ class UserAdmin(UserAdmin):
     add_form = CustomUserCreationForm
 
     fieldsets = (
-        (None, {'fields': ('username', 'password')}),
+        (None, {'fields': ('id', 'username', 'password')}),
         ('Personal info', {'fields': ('email', 'role', 'is_blocked')}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser')}),
     )
@@ -20,7 +20,7 @@ class UserAdmin(UserAdmin):
             'fields': ('username', 'email', 'password1', 'password2', 'role'),
         }),
     )
-    readonly_fields = ['password']
+    readonly_fields = ('id', 'password')
     list_display = ('username', 'email', 'role', 'is_blocked', 'is_active')
     search_fields = ('username', 'email')
     ordering = ('username',)

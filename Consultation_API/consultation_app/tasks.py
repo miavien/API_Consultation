@@ -8,19 +8,24 @@ from .models import *
 
 logger = logging.getLogger(__name__)
 
+
 @shared_task
 def send_confirmation_email(user_id):
-
     try:
         user = User.objects.get(id=user_id)
-        send_mail(
-            'Confirmation Email',
-            'Please confirm your registration.',
-            settings.DEFAULT_FROM_EMAIL,
-            [user.email],
-            fail_silently=False,
-        )
-        logger.info(f"Confirmation email sent to: {user.email}")
+        confirmation_url = f'{settings.SITE_URL}/confirm/{user.activation_token}/'
+        if user.is_active == False:
+            send_mail(
+            subject = 'Подтверждение регистрации',
+            message = (
+                f'Здравствуйте, {user.username}!\n\n'
+                f'Пожалуйста, подтвердите вашу регистрацию, перейдя по следующей ссылке: {confirmation_url}\n\n'
+                f'Ваш логин: {user.username}\n'
+                f'Ваш пароль: {user.password}\n'
+            ),
+            from_email = settings.DEFAULT_FROM_EMAIL,
+            recipient_list = [user.email])
+            logger.info(f"Confirmation email sent to: {user.email}")
     except User.DoesNotExist:
         logger.error(f"User with ID {user_id} does not exist.")
 

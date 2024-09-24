@@ -1,7 +1,8 @@
-from django.utils import timezone
 from rest_framework import serializers
-from .models import *
 from .tasks import *
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class LoginSerializer(serializers.Serializer):
@@ -119,7 +120,8 @@ class SpecialistConsultationListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultation
-        fields = ['id', 'client_username', 'date', 'start_time', 'end_time', 'status_display', 'is_canceled', 'is_completed']
+        fields = ['id', 'client_username', 'date', 'start_time', 'end_time', 'status_display', 'is_canceled',
+                  'is_completed']
 
     def get_status_display(self, obj):
         return obj.get_status_display()
