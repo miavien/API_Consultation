@@ -4,6 +4,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from rest_framework import status
 from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate, login
@@ -91,6 +92,7 @@ class LoginAPIView(APIView):
 
 
 class UserRegistrationAPIView(APIView):
+    permission_classes = [AllowAny]
     @extend_schema(
         summary='Регистрация',
         description='Метод для регистрации пользователя. '

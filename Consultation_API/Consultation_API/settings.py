@@ -140,37 +140,36 @@ SITE_URL = 'http://localhost:8000'
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.BasicAuthentication",
-        # 'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
+
+# SPECTACULAR_SETTINGS = {
+#     'TITLE': 'API для записи на приём',
+#     'DESCRIPTION': 'API для записи на консультацию',
+#     'VERSION': '1.0.0',
+#     'SERVE_INCLUDE_SCHEMA': False,
+#
+# }
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'API для записи на приём',
     'DESCRIPTION': 'API для записи на консультацию',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-
+    'SECURITY': [
+        {
+            'bearerAuth': [],
+        },
+    ],
+    'COMPONENT_SPLIT_REQUEST': True,
+    'CAMELIZE_NAMES': False,
+    'RESPONSIVE_DOCS': True,
 }
-
-# SPECTACULAR_SETTINGS = {
-#     'TITLE': 'Your API',
-#     'DESCRIPTION': 'API description',
-#     'VERSION': '1.0.0',
-#     'SERVE_INCLUDE_SCHEMA': False,
-#     'SECURITY': [
-#         {
-#             'bearerAuth': [],
-#         },
-#     ],
-#     'COMPONENT_SPLIT_REQUEST': True,
-#     'CAMELIZE_NAMES': False,
-#     'RESPONSIVE_DOCS': True,
-# }
 
 
 AUTHENTICATION_BACKENDS = [
@@ -183,6 +182,9 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+# чтобы тесты не попадали в очередь celery
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
 
 # EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 EMAIL_HOST = 'smtp.yandex.ru'
