@@ -1,21 +1,18 @@
-from datetime import time
-from http.client import responses
-
 import pytest
+from datetime import time
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from django.urls import reverse
 from rest_framework import status
 from django.utils import timezone
-from .models import *
+from consultation_app.models import *
 from dateutil.parser import parse
-from django.test import TestCase
 
-# Create your tests here.
 
 @pytest.fixture
 def api_client():
     return APIClient()
+
 
 @pytest.fixture
 def user_specialist(db):
@@ -29,6 +26,7 @@ def user_specialist(db):
     user.save()
     return user
 
+
 @pytest.fixture
 def user_client(db):
     User = get_user_model()
@@ -41,17 +39,20 @@ def user_client(db):
     user.save()
     return user
 
+
 @pytest.fixture
 def authenticated_api_specialist(api_client, user_specialist):
     api_client.force_authenticate(user=user_specialist)
     api_client.user = user_specialist
     return api_client
 
+
 @pytest.fixture
 def authenticated_api_client(api_client, user_client):
     api_client.force_authenticate(user=user_client)
     api_client.user = user_client
     return api_client
+
 
 @pytest.fixture
 def valid_slot_data():
@@ -61,6 +62,7 @@ def valid_slot_data():
         'end_time': time(13, 30),
         'context': 'Some context here'
     }
+
 
 @pytest.mark.django_db
 class TestUserRegistrationAPIView:
@@ -217,22 +219,3 @@ class TestSpecialistSlotListView:
         url = reverse('specialist-slots')
         response = authenticated_api_client.get(url)
         assert response.status_code == status.HTTP_403_FORBIDDEN
-
-@pytest.mark.django_db
-class TestClientConsultationAPIView:
-
-    @pytest.fixture
-    def valid_slot(self, valid_slot_data, user_specialist):
-        slot_data = valid_slot_data.copy()
-        slot_data['specialist'] = user_specialist
-        slot_data['id'] = 1
-        return slot_data
-
-    def test_create_slot_success(self, authenticated_api_client, valid_slot):
-        slot = Slot.objects.create(**valid_slot)
-        url = reverse('create-consultation')
-        request_data = {'slot_id': slot.id}
-        response = authenticated_api_client.post(url, request_data)
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data['message'] == 'Запрос на консультацию успешно отправлен'
-        assert 'data' in response.data

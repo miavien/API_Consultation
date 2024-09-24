@@ -1,5 +1,5 @@
+import logging
 from datetime import datetime
-
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from rest_framework import status
@@ -11,6 +11,7 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 from .serializers import *
 from .permissions import *
 
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 class LoginAPIView(APIView):
@@ -70,16 +71,21 @@ class LoginAPIView(APIView):
             try:
                 user = User.objects.get(username=username)
                 if not user.is_active:
+                    logger.warning(f'Inactive account login attempt: {username}')
                     return Response({'message': 'Ваш аккаунт не активирован. Пожалуйста, подтвердите регистрацию'},
                                     status=status.HTTP_403_FORBIDDEN)
             except User.DoesNotExist:
+                logger.error('User does not exist: {username}')
                 return Response({'message': 'Пользователя с таким username не существует'},
                                 status=status.HTTP_400_BAD_REQUEST)
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
+                logger.info(f'User {username} logged successfully')
                 return Response({'message': 'Авторизация успешна'}, status=status.HTTP_200_OK)
+            logger.error(f'Incorrect password attempt for user: {username}')
             return Response({'message': 'Неверный пароль для этого аккаунта'}, status=status.HTTP_400_BAD_REQUEST)
+        logger.error('Invalid login data')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -488,6 +494,10 @@ class ClientConsultationAPIView(APIView):
             slot_id = serializer.validated_data['slot_id']
             if Consultation.objects.filter(slot_id=slot_id, status='Accepted').exists():
                 return Response({'message': 'Для данного слота уже существует подтверждённая консультация'},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+            if Slot.objects.filter(id=slot_id, is_available=False).exists():
+                return Response({'message': 'Вы не можете занять данный слот'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
             if Consultation.objects.filter(slot_id=slot_id, client=request.user):
