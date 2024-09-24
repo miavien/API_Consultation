@@ -63,6 +63,22 @@ def valid_slot_data():
         'context': 'Some context here'
     }
 
+@pytest.fixture
+def slot(valid_slot_data, user_specialist):
+    return Slot.objects.create(
+        specialist=user_specialist,
+        date=valid_slot_data['date'],
+        start_time=valid_slot_data['start_time'],
+        end_time=valid_slot_data['end_time']
+    )
+
+@pytest.fixture
+def consultation(slot, user_client):
+    return Consultation.objects.create(
+        slot=slot,
+        client=user_client,
+        status='Pending'
+    )
 
 @pytest.mark.django_db
 class TestUserRegistrationAPIView:
@@ -94,6 +110,7 @@ class TestUserRegistrationAPIView:
         assert response.data['message'] == 'Для подтверждения регистрации на указанную почту отправлено письмо'
 
         user = User.objects.get(username='testuser')
+
         assert user.username == valid_user_data['username']
         assert user.email == valid_user_data['email']
         assert user.check_password(valid_user_data['password'])
@@ -102,6 +119,7 @@ class TestUserRegistrationAPIView:
     def test_registration_not_success(self, api_client, invalid_user_data):
         url = reverse('registration-api')
         response = api_client.post(url, invalid_user_data)
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'non_field_errors' in response.data
         assert response.data['non_field_errors'] == ['Пароли не совпадают']
@@ -120,6 +138,7 @@ class TestUserRegistrationAPIView:
         url = reverse('registration-api')
         api_client.post(url, valid_user_data)
         response = api_client.post(url, valid_user_data)
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'username' in response.data
 
@@ -131,6 +150,7 @@ class TestCreateSlotAPIView:
         valid_slot_data.pop('context', None)
         url = reverse('create-slot')
         response = authenticated_api_specialist.post(url, valid_slot_data)
+
         assert response.status_code == status.HTTP_200_OK
         assert response.data['message'] == 'Слот успешно создан'
 
@@ -152,6 +172,7 @@ class TestCreateSlotAPIView:
         invalid_slot_data['end_time'] = '12:30:00'
         url = reverse('create-slot')
         response = authenticated_api_specialist.post(url, invalid_slot_data)
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'detail' in response.data
         assert response.data['detail'][0] == 'Время окончания должно быть позже времени начала'
@@ -161,6 +182,7 @@ class TestCreateSlotAPIView:
         invalid_slot_data['date'] = timezone.now().date() - timezone.timedelta(days=1)
         url = reverse('create-slot')
         response = authenticated_api_specialist.post(url, invalid_slot_data)
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'detail' in response.data
         assert response.data['detail'][0] == 'Дата не может быть ранее сегодняшнего дня'
@@ -173,6 +195,7 @@ class TestCreateSlotAPIView:
         overlapping_slot_data['start_time'] = '13:15:00'
         overlapping_slot_data['end_time'] = '13:45:00'
         response = authenticated_api_specialist.post(url, overlapping_slot_data)
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'detail' in response.data
         assert response.data['detail'][0] == 'Время слота пересекается с другим слотом'
@@ -180,6 +203,7 @@ class TestCreateSlotAPIView:
     def test_create_slot_missing_fields(self, authenticated_api_specialist):
         url = reverse('create-slot')
         response = authenticated_api_specialist.post(url, {})
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'date' in response.data
         assert 'start_time' in response.data
@@ -189,10 +213,9 @@ class TestCreateSlotAPIView:
 @pytest.mark.django_db
 class TestSpecialistSlotListView:
 
-    def test_get_slots_success(self, authenticated_api_specialist, valid_slot_data):
-        Slot.objects.create(specialist=authenticated_api_specialist.user, **valid_slot_data)
+    def test_get_slots_success(self, authenticated_api_specialist, slot):
         url = reverse('specialist-slots')
-        response = authenticated_api_specialist.get(url, valid_slot_data)
+        response = authenticated_api_specialist.get(url)
         assert response.status_code == status.HTTP_200_OK
         # проверяем, что создался 1 слот
         assert len(response.data) == 1
@@ -219,3 +242,177 @@ class TestSpecialistSlotListView:
         url = reverse('specialist-slots')
         response = authenticated_api_client.get(url)
         assert response.status_code == status.HTTP_403_FORBIDDEN
+
+@pytest.mark.django_db
+class TestSpecialistConsultationListView:
+
+    def test_get_consultations_success(self, authenticated_api_specialist, consultation):
+        url = reverse('specialist-consultations')
+        response = authenticated_api_specialist.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) == 1
+        assert response.data[0]['id'] == consultation.id
+        assert response.data[0]['client_username'] == consultation.client.username
+        assert response.data[0]['status_display'] == consultation.get_status_display()
+
+    def test_get_consultations_empty(self, authenticated_api_specialist):
+        url = reverse('specialist-consultations')
+        response = authenticated_api_specialist.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == []
+
+    def test_get_slots_non_specialist(self, authenticated_api_client):
+        url = reverse('specialist-consultations')
+        response = authenticated_api_client.get(url)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_get_consultations_with_multiple_entries(self, authenticated_api_specialist, consultation, slot):
+        url = reverse('specialist-consultations')
+        Consultation.objects.create(slot=slot, client=consultation.client, status='Pending')
+        Consultation.objects.create(slot=slot, client=consultation.client, status='Completed')
+        response = authenticated_api_specialist.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) > 1
+
+@pytest.mark.django_db
+class TestUpdateStatusConsultationAPIView:
+
+    def test_update_status_success(self, authenticated_api_specialist, consultation, slot):
+        url = reverse('update-status')
+        data = {
+            'consultation_id': consultation.id,
+            'status': 'Accepted'
+        }
+        response = authenticated_api_specialist.patch(url, data)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['message'] == 'Статус консультации обновлён'
+        consultation.refresh_from_db()
+        assert consultation.status == 'Accepted'
+        assert not consultation.slot.is_available
+
+    def test_update_status_invalid_status(self, authenticated_api_specialist, consultation):
+        url = reverse('update-status')
+        data = {
+            'consultation_id': consultation.id,
+            'status': 'Invalid_status'
+        }
+        response = authenticated_api_specialist.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'status' in response.data
+        consultation.refresh_from_db()
+        assert consultation.status != 'New'
+
+    def test_update_status_invalid_id(self, authenticated_api_specialist, consultation):
+        url = reverse('update-status')
+        data = {
+            'consultation_id': 9999,
+            'status': 'Accepted'
+        }
+        response = authenticated_api_specialist.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'consultation_id' in response.data
+
+    def test_update_status_non_specialist(self, authenticated_api_client, consultation):
+        url = reverse('update-status')
+        data = {
+            'consultation_id': consultation.id,
+            'status': 'Accepted'
+        }
+        response = authenticated_api_client.patch(url, data)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        consultation.refresh_from_db()
+        assert consultation.status != 'Accepted'
+
+@pytest.mark.django_db
+class TestSlotUpdateAPIView:
+
+    def test_update_slot_success(self, authenticated_api_specialist, slot, valid_slot_data):
+        url = reverse('update-slot')
+        data = valid_slot_data.copy()
+        data['id'] = slot.id
+        data['start_time'] = time(14, 0)
+        data['end_time'] = time(14, 30)
+        response = authenticated_api_specialist.patch(url, data)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['message'] == 'Слот успешно обновлен'
+        slot.refresh_from_db()
+        assert slot.start_time == data['start_time']
+        assert slot.end_time == data['end_time']
+        assert 'id' in response.data['data']
+        assert 'date' in response.data['data']
+        assert 'start_time' in response.data['data']
+        assert 'end_time' in response.data['data']
+
+    def test_update_slot_invalid_id(self, authenticated_api_specialist):
+        url = reverse('update-slot')
+        data = {
+            'id': 9999,
+            'start_time': '14:00:00',
+            'end_time': '14:30:00',
+        }
+        response = authenticated_api_specialist.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data['message'] == 'Вашего слота с таким id не существует'
+
+    def test_update_slot_missing_id(self, authenticated_api_specialist):
+        url = reverse('update-slot')
+        data = {
+            'start_time': '14:00:00',
+            'end_time': '14:30:00',
+        }
+        response = authenticated_api_specialist.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data['message'] == 'Необходимо указать id слота'
+
+    def test_update_slot_invalid_specialist_username(self, authenticated_api_specialist, slot):
+        url = reverse('update-slot')
+        data = {
+            'id': slot.id,
+            'specialist_username': 'invalid_username'
+        }
+        response = authenticated_api_specialist.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data['specialist_username'] == 'Специалист с таким юзернеймом не найден'
+
+    def test_update_slot_non_specialist(self, authenticated_api_client, slot):
+        url = reverse('update-slot')
+        data = {
+            'id': slot.id,
+            'start_time': '14:00:00',
+            'end_time': '14:30:00',
+        }
+        response = authenticated_api_client.patch(url, data)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_update_slot_time_overlap(self, authenticated_api_specialist, user_specialist, slot, valid_slot_data):
+        Slot.objects.create(
+            specialist=user_specialist,
+            date=slot.date,
+            start_time=time(14, 15),
+            end_time=time(14, 45)
+        )
+
+        url = reverse('update-slot')
+        data = {
+            'id': slot.id,
+            'start_time': time(14, 10),
+            'end_time': time(14, 30),
+        }
+
+        response = authenticated_api_specialist.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data['detail'] == 'Время слота пересекается с другим слотом специалиста'
