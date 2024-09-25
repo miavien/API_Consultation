@@ -166,8 +166,10 @@ SPECTACULAR_SETTINGS = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),  # Время жизни access токена
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=60),  # Время жизни refresh токена
+    # Время жизни access токена
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    # Время жизни refresh токена
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=60),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': False,
@@ -261,5 +263,15 @@ LOGGING = {
             'level': 'WARNING',
             'propagate': False,
         },
+    }
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://redis:6379/1',
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
     }
 }

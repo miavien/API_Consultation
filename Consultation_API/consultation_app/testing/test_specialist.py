@@ -63,6 +63,7 @@ def valid_slot_data():
         'context': 'Some context here'
     }
 
+
 @pytest.fixture
 def slot(valid_slot_data, user_specialist):
     return Slot.objects.create(
@@ -72,6 +73,7 @@ def slot(valid_slot_data, user_specialist):
         end_time=valid_slot_data['end_time']
     )
 
+
 @pytest.fixture
 def consultation(slot, user_client):
     return Consultation.objects.create(
@@ -79,6 +81,7 @@ def consultation(slot, user_client):
         client=user_client,
         status='Pending'
     )
+
 
 @pytest.mark.django_db
 class TestUserRegistrationAPIView:
@@ -243,6 +246,7 @@ class TestSpecialistSlotListView:
         response = authenticated_api_client.get(url)
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
+
 @pytest.mark.django_db
 class TestSpecialistConsultationListView:
 
@@ -277,6 +281,7 @@ class TestSpecialistConsultationListView:
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) > 1
+
 
 @pytest.mark.django_db
 class TestUpdateStatusConsultationAPIView:
@@ -330,6 +335,7 @@ class TestUpdateStatusConsultationAPIView:
         assert response.status_code == status.HTTP_403_FORBIDDEN
         consultation.refresh_from_db()
         assert consultation.status != 'Accepted'
+
 
 @pytest.mark.django_db
 class TestSlotUpdateAPIView:

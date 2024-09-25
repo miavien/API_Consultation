@@ -82,7 +82,7 @@ def consultation(slot, user_client):
     )
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestClientConsultationAPIView:
 
     @pytest.fixture
@@ -158,7 +158,8 @@ class TestClientConsultationAPIView:
         assert 'slot_id' in response.data
         assert response.data['slot_id'][0] == 'Слота с таким id не существует'
 
-@pytest.mark.django_db
+
+@pytest.mark.django_db(transaction=True)
 class TestClientConsultationListView:
 
     def test_get_consultations_success(self, authenticated_api_client, consultation, slot):
@@ -192,6 +193,7 @@ class TestClientConsultationListView:
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) > 1
+
 
 @pytest.mark.django_db
 class TestCancelConsultationAPIView:

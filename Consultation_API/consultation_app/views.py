@@ -4,91 +4,14 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from rest_framework import status
 from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.contrib.auth import authenticate, login
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample, extend_schema_view
 from .serializers import *
 from .permissions import *
 
 logger = logging.getLogger(__name__)
-
-
-# Create your views here.
-# class LoginAPIView(APIView):
-#     serializer_class = LoginSerializer
-#
-#     @extend_schema(
-#         summary='Авторизация',
-#         description='Метод для авторизации пользователя',
-#         request=LoginSerializer,
-#         responses={
-#             200: OpenApiResponse(
-#                 response=LoginSerializer,
-#                 description='Авторизация успешна',
-#                 examples=[
-#                     OpenApiExample(
-#                         'Авторизация успешна',
-#                         value={'message': 'Авторизация успешна'})
-#                 ]
-#             ),
-#             400: OpenApiResponse(
-#                 response=LoginSerializer,
-#                 description='Ошибка авторизации',
-#                 examples=[
-#                     OpenApiExample(
-#                         'Неверный username',
-#                         value={'message': 'Пользователя с таким username не существует'}
-#                     ),
-#                     OpenApiExample(
-#                         'Неверный пароль',
-#                         value={'message': 'Неверный пароль для этого аккаунта'}
-#                     ),
-#                     OpenApiExample(
-#                         'Пользователь не активен',
-#                         value={'message': 'Ваш аккаунт не активирован. Пожалуйста, подтвердите регистрацию'}
-#                     ),
-#                 ]
-#             )
-#         },
-#         examples=[
-#             OpenApiExample(
-#                 'Пример запроса',
-#                 description='Пример запроса',
-#                 value={
-#                     'username': 'user1',
-#                     'password': 'password123'
-#                 },
-#                 status_codes=[str(status.HTTP_202_ACCEPTED)],
-#             )
-#         ],
-#         tags=['For everyone']
-#     )
-#     def post(self, request):
-#         serializer = self.serializer_class(data=request.data)
-#         if serializer.is_valid():
-#             username = serializer.validated_data['username']
-#             password = serializer.validated_data['password']
-#             try:
-#                 user = User.objects.get(username=username)
-#                 if not user.is_active:
-#                     logger.warning(f'Inactive account login attempt: {username}')
-#                     return Response({'message': 'Ваш аккаунт не активирован. Пожалуйста, подтвердите регистрацию'},
-#                                     status=status.HTTP_403_FORBIDDEN)
-#             except User.DoesNotExist:
-#                 logger.warning('User does not exist: {username}')
-#                 return Response({'message': 'Пользователя с таким username не существует'},
-#                                 status=status.HTTP_400_BAD_REQUEST)
-#             user = authenticate(request, username=username, password=password)
-#             if user is not None:
-#                 login(request, user)
-#                 logger.info(f'User {username} logged successfully')
-#                 return Response({'message': 'Авторизация успешна'}, status=status.HTTP_200_OK)
-#             logger.warning(f'Incorrect password attempt for user: {username}')
-#             return Response({'message': 'Неверный пароль для этого аккаунта'}, status=status.HTTP_400_BAD_REQUEST)
-#         logger.warning('Invalid login data')
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserRegistrationAPIView(APIView):
