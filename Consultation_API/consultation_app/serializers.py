@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .tasks import *
 import logging
@@ -14,6 +15,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     password_confirm = serializers.CharField(write_only=True)
     email = serializers.EmailField(required=True)
+    raw_password = None
 
     class Meta:
         model = User
@@ -31,6 +33,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.activation_token = uuid.uuid4()
         user.save()
+        self.raw_password = password
         return user
 
 
@@ -107,11 +110,13 @@ class ConsultationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Слота с таким id не существует')
         return value
 
+    @extend_schema_field(serializers.CharField)
     def get_status_display(self, obj):
         return obj.get_status_display()
 
 
 class SpecialistConsultationListSerializer(serializers.ModelSerializer):
+    slot_id = serializers.IntegerField(source='slot.id', read_only=True)
     date = serializers.DateField(source='slot.date', read_only=True)
     start_time = serializers.TimeField(source='slot.start_time', read_only=True)
     end_time = serializers.TimeField(source='slot.end_time', read_only=True)
@@ -120,7 +125,7 @@ class SpecialistConsultationListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultation
-        fields = ['id', 'client_username', 'date', 'start_time', 'end_time', 'status_display', 'is_canceled',
+        fields = ['id', 'slot_id', 'client_username', 'date', 'start_time', 'end_time', 'status_display', 'is_canceled',
                   'is_completed']
 
     def get_status_display(self, obj):

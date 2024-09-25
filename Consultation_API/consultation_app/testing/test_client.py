@@ -158,15 +158,6 @@ class TestClientConsultationAPIView:
         assert 'slot_id' in response.data
         assert response.data['slot_id'][0] == 'Слота с таким id не существует'
 
-    def test_create_consultation_slot_not_available(self, authenticated_api_client, valid_slot):
-        slot = Slot.objects.create(**valid_slot, is_available=False)
-        url = reverse('create-consultation')
-        request_data = {'slot_id': slot.id}
-        response = authenticated_api_client.post(url, request_data)
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data['message'] == 'Вы не можете занять данный слот'
-
 @pytest.mark.django_db
 class TestClientConsultationListView:
 

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task
-def send_confirmation_email(user_id):
+def send_confirmation_email(user_id, raw_password):
     try:
         user = User.objects.get(id=user_id)
         confirmation_url = f'{settings.SITE_URL}/confirm/{user.activation_token}/'
@@ -21,7 +21,7 @@ def send_confirmation_email(user_id):
                 f'Здравствуйте, {user.username}!\n\n'
                 f'Пожалуйста, подтвердите вашу регистрацию, перейдя по следующей ссылке: {confirmation_url}\n\n'
                 f'Ваш логин: {user.username}\n'
-                f'Ваш пароль: {user.password}\n'
+                f'Ваш пароль: {raw_password}\n'
             ),
             from_email = settings.DEFAULT_FROM_EMAIL,
             recipient_list = [user.email])
@@ -40,6 +40,7 @@ def send_accepted_status_email(consultation_id):
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email]
     )
+    logger.info(f"Confirmation email sent to: {user.email}")
 
 
 @shared_task

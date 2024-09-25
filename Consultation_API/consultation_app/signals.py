@@ -4,7 +4,7 @@ from .models import *
 from .tasks import *
 
 
-@receiver(post_save, sender=User)
-def user_post_save(sender, instance, created, **kwargs):
-    if created:
-        send_confirmation_email.delay(instance.id)
+# @receiver(post_save, sender=User)
+# def user_post_save(sender, instance, created, **kwargs):
+#     if created:
+#         send_confirmation_email.delay(instance.id)

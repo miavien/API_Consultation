@@ -16,83 +16,84 @@ logger = logging.getLogger(__name__)
 
 
 # Create your views here.
-class LoginAPIView(APIView):
-    serializer_class = LoginSerializer
-
-    @extend_schema(
-        summary='Авторизация',
-        description='Метод для авторизации пользователя',
-        request=LoginSerializer,
-        responses={
-            200: OpenApiResponse(
-                response=LoginSerializer,
-                description='Авторизация успешна',
-                examples=[
-                    OpenApiExample(
-                        'Авторизация успешна',
-                        value={'message': 'Авторизация успешна'})
-                ]
-            ),
-            400: OpenApiResponse(
-                response=LoginSerializer,
-                description='Ошибка авторизации',
-                examples=[
-                    OpenApiExample(
-                        'Неверный username',
-                        value={'message': 'Пользователя с таким username не существует'}
-                    ),
-                    OpenApiExample(
-                        'Неверный пароль',
-                        value={'message': 'Неверный пароль для этого аккаунта'}
-                    ),
-                    OpenApiExample(
-                        'Пользователь не активен',
-                        value={'message': 'Ваш аккаунт не активирован. Пожалуйста, подтвердите регистрацию'}
-                    ),
-                ]
-            )
-        },
-        examples=[
-            OpenApiExample(
-                'Пример запроса',
-                description='Пример запроса',
-                value={
-                    'username': 'user1',
-                    'password': 'password123'
-                },
-                status_codes=[str(status.HTTP_202_ACCEPTED)],
-            )
-        ],
-        tags=['For everyone']
-    )
-    def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
-            username = serializer.validated_data['username']
-            password = serializer.validated_data['password']
-            try:
-                user = User.objects.get(username=username)
-                if not user.is_active:
-                    logger.warning(f'Inactive account login attempt: {username}')
-                    return Response({'message': 'Ваш аккаунт не активирован. Пожалуйста, подтвердите регистрацию'},
-                                    status=status.HTTP_403_FORBIDDEN)
-            except User.DoesNotExist:
-                logger.warning('User does not exist: {username}')
-                return Response({'message': 'Пользователя с таким username не существует'},
-                                status=status.HTTP_400_BAD_REQUEST)
-            user = authenticate(request, username=username, password=password)
-            if user is not None:
-                login(request, user)
-                logger.info(f'User {username} logged successfully')
-                return Response({'message': 'Авторизация успешна'}, status=status.HTTP_200_OK)
-            logger.warning(f'Incorrect password attempt for user: {username}')
-            return Response({'message': 'Неверный пароль для этого аккаунта'}, status=status.HTTP_400_BAD_REQUEST)
-        logger.warning('Invalid login data')
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# class LoginAPIView(APIView):
+#     serializer_class = LoginSerializer
+#
+#     @extend_schema(
+#         summary='Авторизация',
+#         description='Метод для авторизации пользователя',
+#         request=LoginSerializer,
+#         responses={
+#             200: OpenApiResponse(
+#                 response=LoginSerializer,
+#                 description='Авторизация успешна',
+#                 examples=[
+#                     OpenApiExample(
+#                         'Авторизация успешна',
+#                         value={'message': 'Авторизация успешна'})
+#                 ]
+#             ),
+#             400: OpenApiResponse(
+#                 response=LoginSerializer,
+#                 description='Ошибка авторизации',
+#                 examples=[
+#                     OpenApiExample(
+#                         'Неверный username',
+#                         value={'message': 'Пользователя с таким username не существует'}
+#                     ),
+#                     OpenApiExample(
+#                         'Неверный пароль',
+#                         value={'message': 'Неверный пароль для этого аккаунта'}
+#                     ),
+#                     OpenApiExample(
+#                         'Пользователь не активен',
+#                         value={'message': 'Ваш аккаунт не активирован. Пожалуйста, подтвердите регистрацию'}
+#                     ),
+#                 ]
+#             )
+#         },
+#         examples=[
+#             OpenApiExample(
+#                 'Пример запроса',
+#                 description='Пример запроса',
+#                 value={
+#                     'username': 'user1',
+#                     'password': 'password123'
+#                 },
+#                 status_codes=[str(status.HTTP_202_ACCEPTED)],
+#             )
+#         ],
+#         tags=['For everyone']
+#     )
+#     def post(self, request):
+#         serializer = self.serializer_class(data=request.data)
+#         if serializer.is_valid():
+#             username = serializer.validated_data['username']
+#             password = serializer.validated_data['password']
+#             try:
+#                 user = User.objects.get(username=username)
+#                 if not user.is_active:
+#                     logger.warning(f'Inactive account login attempt: {username}')
+#                     return Response({'message': 'Ваш аккаунт не активирован. Пожалуйста, подтвердите регистрацию'},
+#                                     status=status.HTTP_403_FORBIDDEN)
+#             except User.DoesNotExist:
+#                 logger.warning('User does not exist: {username}')
+#                 return Response({'message': 'Пользователя с таким username не существует'},
+#                                 status=status.HTTP_400_BAD_REQUEST)
+#             user = authenticate(request, username=username, password=password)
+#             if user is not None:
+#                 login(request, user)
+#                 logger.info(f'User {username} logged successfully')
+#                 return Response({'message': 'Авторизация успешна'}, status=status.HTTP_200_OK)
+#             logger.warning(f'Incorrect password attempt for user: {username}')
+#             return Response({'message': 'Неверный пароль для этого аккаунта'}, status=status.HTTP_400_BAD_REQUEST)
+#         logger.warning('Invalid login data')
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserRegistrationAPIView(APIView):
     permission_classes = [AllowAny]
+
     @extend_schema(
         summary='Регистрация',
         description='Метод для регистрации пользователя. '
@@ -139,6 +140,8 @@ class UserRegistrationAPIView(APIView):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
+            raw_password = serializer.raw_password
+            send_confirmation_email.delay(user.id, raw_password)
             logger.info(f'User {request.data["username"]} has registered')
             return Response({'message': 'Для подтверждения регистрации на указанную почту отправлено письмо'},
                             status=status.HTTP_200_OK)
@@ -146,6 +149,8 @@ class UserRegistrationAPIView(APIView):
 
 
 class ConfirmRegistrationAPIView(APIView):
+    permission_classes = [AllowAny]
+
     @extend_schema(exclude=True)
     def get(self, request, token, *args, **kwargs):
         user = get_object_or_404(User, activation_token=token)
@@ -326,11 +331,27 @@ class CreateSlotAPIView(APIView):
                 examples=[
                     OpenApiExample(
                         'Некорректная дата',
-                        value={'detail': 'Дата не может быть ранее сегодняшнего дня'}
+                        value={
+                            'detail': [
+                                'Дата не может быть ранее сегодняшнего дня'
+                            ]
+                        }
                     ),
                     OpenApiExample(
                         'Некорректное время',
-                        value={'detail': 'Время окончания должно быть позже времени начала'}
+                        value={
+                            'detail': [
+                                'Время окончания должно быть позже времени начала'
+                            ]
+                        }
+                    ),
+                    OpenApiExample(
+                        'Некорректное время',
+                        value={
+                            'detail': [
+                                'Время слота пересекается с другим слотом'
+                            ]
+                        }
                     )
                 ]
             )
@@ -399,7 +420,6 @@ class SpecialistSlotListView(ListAPIView):
     permission_classes = [IsSpecialistUser]
 
     def get_queryset(self):
-        logger.info(f"User {self.request.user.username} is retrieving slots")
         return Slot.objects.filter(specialist=self.request.user)
 
 
@@ -436,7 +456,6 @@ class ClientSlotListView(ListAPIView):
     def get_queryset(self):
         now = timezone.now()
         # фильтруем, чтобы либо дата была больше сегодняшней, либо сегодня, но время старта больше текущего времени
-        logger.info(f'User {self.request.user.username} is retrieving slots')
         return Slot.objects.filter(
             Q(is_available=True) & (Q(date__gt=now.date()) | Q(date=now.date(), start_time__gte=now.time()))
         )
@@ -482,7 +501,11 @@ class ClientConsultationAPIView(APIView):
                     ),
                     OpenApiExample(
                         'Некорректный id слота',
-                        value={'detail': 'Слота с таким id не существует'}
+                        value={
+                            'slot_id': [
+                                'Слота с таким id не существует'
+                            ]
+                        }
                     ),
                     OpenApiExample(
                         'Повторный запрос',
@@ -512,11 +535,6 @@ class ClientConsultationAPIView(APIView):
             if Consultation.objects.filter(slot_id=slot_id, status='Accepted').exists():
                 logger.warning(f'Failed by user {request.user.username} for slot {slot_id}')
                 return Response({'message': 'Для данного слота уже существует подтверждённая консультация'},
-                                status=status.HTTP_400_BAD_REQUEST)
-
-            if Slot.objects.filter(id=slot_id, is_available=False).exists():
-                logger.warning(f'Failed by User {request.user.username} for slot {slot_id}')
-                return Response({'message': 'Вы не можете занять данный слот'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
             if Consultation.objects.filter(slot_id=slot_id, client=request.user):
@@ -579,7 +597,6 @@ class SpecialistConsultationListView(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        logger.info(f'User {self.request.user.username} is retrieving consultations')
         return Consultation.objects.filter(slot__specialist=user)
 
 
@@ -616,7 +633,6 @@ class ClientConsultationListView(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        logger.info(f'User {self.request.user.username} is retrieving consultations')
         return Consultation.objects.filter(client=user)
 
 
@@ -651,7 +667,11 @@ class UpdateStatusConsultationAPIView(APIView):
                     ),
                     OpenApiExample(
                         'Некорректный id консультации',
-                        value={'detail': 'Консультации с таким id не существует'}
+                        value={
+                            'consultation_id': [
+                                'Консультации с таким id не существует'
+                            ]
+                        }
                     )
                 ]
             )
