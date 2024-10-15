@@ -1,10 +1,12 @@
 import logging
 from datetime import datetime
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404, redirect
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample, extend_schema_view
@@ -59,7 +61,7 @@ class UserRegistrationAPIView(APIView):
         ],
         tags=['For everyone']
     )
-    def post(self, request, *args, **kwargs):
+    def post(self, request: Request) -> Response:
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
@@ -75,7 +77,7 @@ class ConfirmRegistrationAPIView(APIView):
     permission_classes = [AllowAny]
 
     @extend_schema(exclude=True)
-    def get(self, request, token, *args, **kwargs):
+    def get(self, request: Request, token: str) -> Response:
         user = get_object_or_404(User, activation_token=token)
 
         if user.is_active:
@@ -110,12 +112,18 @@ class BlockUserAPIView(APIView):
                 description='Неверный запрос',
                 examples=[
                     OpenApiExample(
-                        'Неверный запрос_1',
-                        value={'message': 'Пользователь с таким id уже заблокирован'}
-                    ),
+                        'Неверный запрос',
+                        value={'detail': 'Пользователь с таким id уже заблокирован'}
+                    )
+                ]
+            ),
+            404: OpenApiResponse(
+                response=BlockUserSerializer,
+                description='Не найдено',
+                examples=[
                     OpenApiExample(
-                        'Неверный запрос_2',
-                        value={'message': 'Пользователь с таким id не найден'}
+                        'Не найдено',
+                        value={'detail': 'Пользователь с таким id не найден'}
                     ),
                 ]
             )
@@ -132,7 +140,7 @@ class BlockUserAPIView(APIView):
         ],
         tags=['For admin']
     )
-    def post(self, request):
+    def post(self, request: Request) -> Response:
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             user_id = serializer.validated_data['id']
@@ -144,12 +152,12 @@ class BlockUserAPIView(APIView):
                     logger.info(f'User {user.username} has been blocked')
                     return Response({'message': 'Пользователь заблокирован'}, status=status.HTTP_200_OK)
                 logger.warning(f'User {user.username} is already blocked')
-                return Response({'message': 'Пользователь с таким id уже заблокирован'},
+                return Response({'detail': 'Пользователь с таким id уже заблокирован'},
                                 status=status.HTTP_400_BAD_REQUEST)
             except User.DoesNotExist:
                 logger.warning(f'User with id {user_id} not exist')
-                return Response({'message': 'Пользователь с таким id не найден'}, status=status.HTTP_400_BAD_REQUEST)
-        logger.warning(f'User block request failed validation: {serializer.errors}')
+                return Response({'detail': 'Пользователь с таким id не найден'}, status=status.HTTP_404_NOT_FOUND)
+        logger.error(f'User block request failed validation: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -177,11 +185,17 @@ class UnblockUserAPIView(APIView):
                 examples=[
                     OpenApiExample(
                         'Неверный запрос_1',
-                        value={'message': 'Пользователь с таким id не заблокирован'}
-                    ),
+                        value={'detail': 'Пользователь с таким id не заблокирован'}
+                    )
+                ]
+            ),
+            404: OpenApiResponse(
+                response=BlockUserSerializer,
+                description='Не найдено',
+                examples=[
                     OpenApiExample(
-                        'Неверный запрос_2',
-                        value={'message': 'Пользователь с таким id не найден'}
+                        'Не найдено',
+                        value={'detail': 'Пользователь с таким id не найден'}
                     ),
                 ]
             )
@@ -198,7 +212,7 @@ class UnblockUserAPIView(APIView):
         ],
         tags=['For admin']
     )
-    def post(self, request):
+    def post(self, request: Request) -> Response:
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             user_id = serializer.validated_data['id']
@@ -211,12 +225,12 @@ class UnblockUserAPIView(APIView):
                     return Response({'message': 'Пользователь разблокирован'}, status=status.HTTP_200_OK)
                 else:
                     logger.warning(f'User {user.username} is not blocked')
-                    return Response({'message': 'Пользователь с таким id не заблокирован'},
+                    return Response({'detail': 'Пользователь с таким id не заблокирован'},
                                     status=status.HTTP_400_BAD_REQUEST)
             except User.DoesNotExist:
                 logger.warning(f'User with id {user_id} not exist')
-                return Response({'message': 'Пользователь с таким id не найден'}, status=status.HTTP_400_BAD_REQUEST)
-        logger.warning(f'User block request failed validation: {serializer.errors}')
+                return Response({'detail': 'Пользователь с таким id не найден'}, status=status.HTTP_404_NOT_FOUND)
+        logger.error(f'User block request failed validation: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -261,7 +275,7 @@ class CreateSlotAPIView(APIView):
                         }
                     ),
                     OpenApiExample(
-                        'Некорректное время',
+                        'Некорректное время_1',
                         value={
                             'detail': [
                                 'Время окончания должно быть позже времени начала'
@@ -269,10 +283,18 @@ class CreateSlotAPIView(APIView):
                         }
                     ),
                     OpenApiExample(
-                        'Некорректное время',
+                        'Пересечение с другим слотом',
                         value={
                             'detail': [
                                 'Время слота пересекается с другим слотом'
+                            ]
+                        }
+                    ),
+                    OpenApiExample(
+                        'Некорректное время_2',
+                        value={
+                            'detail': [
+                                'Нельзя создать слот на прошедшее время'
                             ]
                         }
                     )
@@ -292,7 +314,7 @@ class CreateSlotAPIView(APIView):
         ],
         tags=['For specialist']
     )
-    def post(self, request):
+    def post(self, request: Request) -> Response:
         serializer = self.serializer_class(data=request.data, context={'request': request})
         if serializer.is_valid():
             validated_data = serializer.validated_data
@@ -307,7 +329,7 @@ class CreateSlotAPIView(APIView):
             slot_serializer = SlotSerializer(slot)
             logger.info(f'Slot with id = {slot.id} has been created')
             return Response({'message': 'Слот успешно создан', 'data': slot_serializer.data}, status=status.HTTP_200_OK)
-        logger.warning(f'Creating slot request failed validation: {serializer.errors}')
+        logger.error(f'Creating slot request failed validation: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -342,7 +364,7 @@ class SpecialistSlotListView(ListAPIView):
     serializer_class = SpecialistSlotListSerializer
     permission_classes = [IsSpecialistUser]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet(Slot):
         return Slot.objects.filter(specialist=self.request.user)
 
 
@@ -376,11 +398,12 @@ class ClientSlotListView(ListAPIView):
     serializer_class = ClientSlotListSerializer
     permission_classes = [IsClientUser]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet(Slot):
         now = timezone.now()
         # фильтруем, чтобы либо дата была больше сегодняшней, либо сегодня, но время старта больше текущего времени
         return Slot.objects.filter(
-            Q(is_available=True) & (Q(date__gt=now.date()) | Q(date=now.date(), start_time__gte=now.time()))
+            Q(is_available=True) &
+            (Q(date__gt=now.date()) | Q(date=now.date(), start_time__gte=now.time()))
         )
 
 
@@ -420,24 +443,28 @@ class ClientConsultationAPIView(APIView):
                 examples=[
                     OpenApiExample(
                         'Слот занят',
-                        value={'message': 'Для данного слота уже существует подтверждённая консультация'}
-                    ),
-                    OpenApiExample(
-                        'Некорректный id слота',
-                        value={
-                            'slot_id': [
-                                'Слота с таким id не существует'
-                            ]
-                        }
+                        value={'detail': 'Для данного слота уже существует подтверждённая консультация'}
                     ),
                     OpenApiExample(
                         'Повторный запрос',
-                        value={'message': 'Вы уже отправили запрос на консультацию на эту дату'}
+                        value={'detail': 'Вы уже отправили запрос на консультацию на эту дату'}
                     ),
                     OpenApiExample(
                         'Некорректное время',
-                        value={'message': 'Дата и время консультации не могут быть ранее текущего времени'}
+                        value={'detail': 'Дата и время консультации не могут быть ранее текущего времени'}
                     )
+                ]
+            ),
+            404: OpenApiResponse(
+                response=ConsultationSerializer,
+                description='Не найдено',
+                examples=[
+                    OpenApiExample(
+                        'Не найдено',
+                        value={
+                            "detail": "Слота с таким id не существует"
+                        }
+                    ),
                 ]
             )
         },
@@ -451,26 +478,32 @@ class ClientConsultationAPIView(APIView):
         ],
         tags=['For client']
     )
-    def post(self, request):
+    def post(self, request: Request) -> Response:
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             slot_id = serializer.validated_data['slot_id']
+
+            try:
+                slot = Slot.objects.get(id=slot_id)
+            except Slot.DoesNotExist:
+                logger.error(f'Slot with id={slot_id} does not exist.')
+                return Response({'detail': 'Слота с таким id не существует'}, status=status.HTTP_404_NOT_FOUND)
+
             if Consultation.objects.filter(slot_id=slot_id, status='Accepted').exists():
-                logger.warning(f'Failed by user {request.user.username} for slot {slot_id}')
-                return Response({'message': 'Для данного слота уже существует подтверждённая консультация'},
+                logger.error(f'Failed by user {request.user.username} for slot {slot_id}')
+                return Response({'detail': 'Для данного слота уже существует подтверждённая консультация'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
             if Consultation.objects.filter(slot_id=slot_id, client=request.user):
-                logger.warning(f'Failed by User {request.user.username} for slot {slot_id}')
-                return Response({'message': 'Вы уже отправили запрос на консультацию на эту дату'},
+                logger.error(f'Failed by User {request.user.username} for slot {slot_id}')
+                return Response({'detail': 'Вы уже отправили запрос на консультацию на эту дату'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
             now = datetime.now()
-            slot = Slot.objects.get(pk=slot_id)
             slot_time = datetime.combine(slot.date, slot.start_time)
             if slot_time < now:
-                logger.warning(f'Failed by User {request.user.username} for slot {slot_id}')
-                return Response({'message': 'Дата и время консультации не могут быть ранее текущего времени'},
+                logger.error(f'Failed by User {request.user.username} for slot {slot_id}')
+                return Response({'detail': 'Дата и время консультации не могут быть ранее текущего времени'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
             consultation_data = {
@@ -483,7 +516,7 @@ class ClientConsultationAPIView(APIView):
             return Response(
                 {'message': 'Запрос на консультацию успешно отправлен', 'data': consultation_serializer.data},
                 status=status.HTTP_200_OK)
-        logger.warning(f'User {request.user.username} failed to book a consultation: {serializer.errors}')
+        logger.error(f'User {request.user.username} failed to book a consultation: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -518,7 +551,7 @@ class SpecialistConsultationListView(ListAPIView):
     serializer_class = SpecialistConsultationListSerializer
     permission_classes = [IsSpecialistUser]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet(Consultation):
         user = self.request.user
         return Consultation.objects.filter(slot__specialist=user)
 
@@ -554,7 +587,7 @@ class ClientConsultationListView(ListAPIView):
     serializer_class = ClientConsultationListSerializer
     permission_classes = [IsClientUser]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet(Consultation):
         user = self.request.user
         return Consultation.objects.filter(client=user)
 
@@ -587,15 +620,19 @@ class UpdateStatusConsultationAPIView(APIView):
                     OpenApiExample(
                         'Неверный статус',
                         value={'detail': 'Некорректный статус'}
-                    ),
-                    OpenApiExample(
-                        'Некорректный id консультации',
-                        value={
-                            'consultation_id': [
-                                'Консультации с таким id не существует'
-                            ]
-                        }
                     )
+                ]
+            ),
+            404: OpenApiResponse(
+                response=UpdateStatusConsultationSerializer,
+                description='Не найдено',
+                examples=[
+                    OpenApiExample(
+                        'Не найдено',
+                        value={
+                            'detail': 'Вашей консультации с таким id не существует'
+                        }
+                    ),
                 ]
             )
         },
@@ -610,15 +647,17 @@ class UpdateStatusConsultationAPIView(APIView):
         ],
         tags=['For specialist']
     )
-    def patch(self, request):
+    def patch(self, request: Request) -> Response:
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             consultation_id = serializer.validated_data['consultation_id']
-            consultation = Consultation.objects.get(id=consultation_id)
+            consultation = Consultation.objects.filter(id=consultation_id).first()
+            if not consultation or consultation.slot.specialist != request.user:
+                return Response({'detail': 'Вашей консультации с таким id не существует'}, status=status.HTTP_404_NOT_FOUND)
             serializer.update(consultation, serializer.validated_data)
             logger.info(f'Consultation with id = {consultation_id} has been updated successfully')
             return Response({'message': 'Статус консультации обновлён'}, status=status.HTTP_200_OK)
-        logger.warning(f'Invalid data received for consultation update: {serializer.errors}')
+        logger.error(f'Invalid data received for consultation update: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -656,14 +695,21 @@ class SlotUpdateAPIView(APIView):
                 examples=[
                     OpenApiExample(
                         'Некорректные данные',
-                        value={'message': 'Необходимо указать id слота'}
-                    ),
-                    OpenApiExample(
-                        'Некорректный id слота',
-                        value={'message': 'Вашего слота с таким id не существует'}
+                        value={'detail': 'Необходимо указать id слота'}
                     )
                 ]
+            ),
+            404: OpenApiResponse(
+                response=SlotUpdateSerializer,
+                description='Не найдено',
+                examples=[
+                    OpenApiExample(
+                        'Не найдено',
+                        value={'detail': 'Вашего слота с таким id не существует'}
+                    ),
+                ]
             )
+
         },
         examples=[
             OpenApiExample(
@@ -678,24 +724,24 @@ class SlotUpdateAPIView(APIView):
         ],
         tags=['For specialist']
     )
-    def patch(self, request):
+    def patch(self, request: Request) -> Response:
         slot_id = request.data.get('id')
         if not slot_id:
             logger.warning(f'Invalid data received for slot update for id={slot_id}')
-            return Response({'message': 'Необходимо указать id слота'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Необходимо указать id слота'}, status=status.HTTP_400_BAD_REQUEST)
 
         slot = Slot.objects.filter(id=slot_id, specialist=request.user).first()
 
         if not slot:
             logger.warning(f'Slot with id={slot_id} is not exists')
-            return Response({'message': 'Вашего слота с таким id не существует'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Вашего слота с таким id не существует'}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = SlotUpdateSerializer(slot, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             logger.info(f'Slot with id = {slot_id} has been updated successfully')
             return Response({'message': 'Слот успешно обновлен', 'data': serializer.data}, status=status.HTTP_200_OK)
-        logger.warning(f'Invalid data received for slot update: {serializer.errors}')
+        logger.error(f'Invalid data received for slot update: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -730,12 +776,22 @@ class CancelConsultationAPIView(APIView):
                         value={'detail': 'Необходимо указать либо причину отмены, либо оставить комментарий'}
                     ),
                     OpenApiExample(
-                        'Некорректный id консультации',
-                        value={'detail': 'Консультации с таким id не существует'}
-                    ),
-                    OpenApiExample(
                         'Некорректная причина',
                         value={'detail': 'Некорректная причина отмены'}
+                    ),
+                    OpenApiExample(
+                        'Неверный статус',
+                        value={'detail': 'Можно отменить только принятую консультацию'}
+                    )
+                ]
+            ),
+            404: OpenApiResponse(
+                response=CancelConsultationSerializer,
+                description='Не найдено',
+                examples=[
+                    OpenApiExample(
+                        'Не найдено',
+                        value={'detail': 'Вашей консультации с таким id не существует'}
                     ),
                 ]
             )
@@ -752,21 +808,76 @@ class CancelConsultationAPIView(APIView):
         ],
         tags=['For client']
     )
-    def patch(self, request):
+    def patch(self, request: Request) -> Response:
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             consultation_id = serializer.validated_data['consultation_id']
-            consultation = Consultation.objects.get(id=consultation_id)
-            if consultation.client != request.user:
-                logger.warning(f'Failed by user {request.user.username} to cancel consultation {consultation_id}')
+            consultation = Consultation.objects.filter(id=consultation_id, client=request.user).first()
+            if not consultation:
                 return Response(
-                    {'message': 'Вы не можете отменить эту консультацию, так как вы не являетесь её клиентом'},
-                    status=status.HTTP_403_FORBIDDEN)
+                    {'detail': 'Вашей консультации с таким id не существует'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            if consultation.status != 'Accepted':
+                return Response({'detail': 'Можно отменить только принятую консультацию'},
+                    status=status.HTTP_400_BAD_REQUEST)
             if consultation.is_canceled == True:
                 logger.warning(f'Failed by user {request.user.username} to cancel consultation {consultation_id}')
-                return Response({'message': 'Вы уже отменили консультацию'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'detail': 'Вы уже отменили консультацию'}, status=status.HTTP_400_BAD_REQUEST)
             serializer.update(consultation, serializer.validated_data)
             logger.info(f'User {request.user.username} has canceled consultation with id = {consultation_id}.')
             return Response({'message': 'Вы отменили консультацию'}, status=status.HTTP_200_OK)
-        logger.warning(f'Invalid data provided for canceling consultation: {serializer.errors}')
+        logger.error(f'Invalid data provided for canceling consultation: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@extend_schema_view(
+    delete=extend_schema(
+        summary='Удаление слота',
+        description='Метод для удаления специалистом личного слота',
+        responses={
+            200: OpenApiResponse(
+                response=CancelConsultationSerializer,
+                description='Успешный запрос',
+                examples=[
+                    OpenApiExample(
+                        'Успешный запрос',
+                        value={
+                            'message': 'Слот успешно удалён',
+                        }
+                    )
+                ]
+            ),
+            404: OpenApiResponse(
+                response=CancelConsultationSerializer,
+                description='Не найдено',
+                examples=[
+                    OpenApiExample(
+                        'Некорректный id слота',
+                        value={'detail': 'Вашего слота с таким id не существует'}
+                    )
+                ]
+            )
+        },
+        examples=[
+            OpenApiExample(
+                'Пример запроса',
+                description='Пример запроса для удаления слота',
+                value={'id': 1},
+                status_codes=[str(status.HTTP_202_ACCEPTED)],
+            )
+        ],
+        tags=['For specialist']
+    )
+)
+class SlotDeleteAPIView(APIView):
+    permission_classes = [IsSpecialistUser]
+
+    def delete(self, request: Request, id: int) -> Response:
+        try:
+            slot = Slot.objects.get(id=id, specialist=request.user)
+
+            slot.delete()
+            logger.info(f'User {request.user} has deleted slot with id = {id}')
+            return Response({'message': 'Слот успешно удалён'}, status=status.HTTP_200_OK)
+        except Slot.DoesNotExist:
+            return Response({'detail': 'Вашего слота с таким id не существует'}, status=status.HTTP_404_NOT_FOUND)

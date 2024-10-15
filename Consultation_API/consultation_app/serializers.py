@@ -1,15 +1,16 @@
+from typing import Dict, Any, Optional
+
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .tasks import *
 from django.utils import timezone
-import logging
-
-logger = logging.getLogger(__name__)
+from .models import *
 
 
-class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+#
+# class LoginSerializer(serializers.Serializer):
+#     username = serializers.CharField()
+#     password = serializers.CharField(write_only=True)
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -22,12 +23,17 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         model = User
         fields = ['username', 'password', 'password_confirm', 'email', 'role']
 
-    def validate(self, data):
+    def validate_email(self, value: str) -> str:
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError('Этот email уже используется')
+        return value
+
+    def validate(self, data: Dict[str, Any]) -> Dict[str, Any]:
         if data['password'] != data['password_confirm']:
             raise serializers.ValidationError('Пароли не совпадают')
         return data
 
-    def create(self, validated_data):
+    def create(self, validated_data: Dict[str, Any]) -> User:
         password = validated_data.pop('password')
         validated_data.pop('password_confirm')
         user = User(**validated_data)
@@ -49,12 +55,16 @@ class SlotSerializer(serializers.ModelSerializer):
         model = Slot
         fields = ['id', 'date', 'start_time', 'end_time', 'duration', 'context']
 
-    def validate(self, data):
+    def validate(self, data: Dict[str, Any]) -> Dict[str, Any]:
         if data['end_time'] <= data['start_time']:
             raise serializers.ValidationError({'detail': 'Время окончания должно быть позже времени начала'})
 
         if data['date'] < timezone.now().date():
             raise serializers.ValidationError({'detail': 'Дата не может быть ранее сегодняшнего дня'})
+
+        now = timezone.now()
+        if data['date'] == now.date() and data['start_time'] <= now.time():
+            raise serializers.ValidationError({'detail': 'Нельзя создать слот на прошедшее время'})
 
         # проверяем на пересечение времени слотов
         specialist = self.context['request'].user
@@ -106,11 +116,6 @@ class ConsultationSerializer(serializers.ModelSerializer):
         read_only_fields = ['client', 'is_canceled', 'cancel_comment',
                             'cancel_reason_choice', 'is_completed', 'status']
 
-    def validate_slot_id(self, value):
-        if not Slot.objects.filter(id=value).exists():
-            raise serializers.ValidationError('Слота с таким id не существует')
-        return value
-
     @extend_schema_field(serializers.CharField)
     def get_status_display(self, obj):
         return obj.get_status_display()
@@ -156,17 +161,12 @@ class UpdateStatusConsultationSerializer(serializers.ModelSerializer):
         model = Consultation
         fields = ['consultation_id', 'status']
 
-    def validate_status(self, value):
+    def validate_status(self, value: str) -> str:
         if value not in dict(Consultation.STATUS_CHOICE).keys():
             raise serializers.ValidationError('Некорректный статус')
         return value
 
-    def validate_consultation_id(self, value):
-        if not Consultation.objects.filter(id=value).exists():
-            raise serializers.ValidationError('Консультации с таким id не существует')
-        return value
-
-    def update(self, instance, validated_data):
+    def update(self, instance: Consultation, validated_data: Dict[str, Any]) -> Consultation:
         status = validated_data.get('status', instance.status)
 
         if status == 'Accepted':
@@ -193,10 +193,30 @@ class SlotUpdateSerializer(serializers.ModelSerializer):
         fields = ['id', 'specialist_username', 'date', 'start_time', 'end_time', 'duration', 'context', 'is_available']
         read_only_fields = ['id', 'is_available', 'specialist', 'duration']
 
-    def get_specialist_username(self, obj):
+    def get_specialist_username(self, obj: Slot) -> Optional[str]:
         return obj.specialist.username if obj.specialist else None
 
-    def update(self, instance, validated_data):
+    def validate(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+
+        if start_time is not None and end_time is not None:
+            if end_time <= start_time:
+                raise serializers.ValidationError({'detail': 'Время окончания должно быть позже времени начала'})
+
+        # Проверка на то, что дата не может быть ранее сегодняшнего дня
+        if 'date' in data and data['date'] < timezone.now().date():
+            raise serializers.ValidationError({'detail': 'Дата не может быть ранее сегодняшнего дня'})
+
+        # Проверка на то, что на сегодняшнюю дату нельзя ставить время, которое уже прошло
+        if 'date' in data and data['date'] == timezone.now().date():
+            now = timezone.now()
+            if 'start_time' in data and start_time <= now.time():
+                raise serializers.ValidationError({'detail': 'Нельзя создать слот на прошедшее время'})
+
+        return data
+
+    def update(self, instance: Slot, validated_data: Dict[str, Any]) -> Slot:
         specialist_username = validated_data.pop('specialist_username', None)
         new_specialist = instance.specialist
 
@@ -214,7 +234,7 @@ class SlotUpdateSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-    def _validate_slot_time(self, new_specialist, data, instance):
+    def _validate_slot_time(self, new_specialist: User, data: Dict[str, Any], instance: Slot) -> None:
         date = data.get('date', instance.date)
         start_time = data.get('start_time', instance.start_time)
         end_time = data.get('end_time', instance.end_time)
@@ -239,24 +259,19 @@ class CancelConsultationSerializer(serializers.ModelSerializer):
         model = Consultation
         fields = ['consultation_id', 'cancel_reason', 'cancel_comment']
 
-    def validate(self, data):
+    def validate(self, data: Dict[str, Any]) -> Dict[str, Any]:
         cancel_reason = data.get('cancel_reason')
         cancel_comment = data.get('cancel_comment')
         if not cancel_reason and not cancel_comment:
             raise serializers.ValidationError('Необходимо указать либо причину отмены, либо оставить комментарий')
         return data
 
-    def validate_cancel_reason(self, value):
+    def validate_cancel_reason(self, value: Optional[str]) -> Optional[str]:
         if value not in dict(Consultation.CANCEL_CHOICE).keys():
             raise serializers.ValidationError('Некорректная причина отмены')
         return value
 
-    def validate_consultation_id(self, value):
-        if not Consultation.objects.filter(id=value).exists():
-            raise serializers.ValidationError('Консультации с таким id не существует')
-        return value
-
-    def update(self, instance, validated_data):
+    def update(self, instance: Consultation, validated_data: Dict[str, Any]) -> Consultation:
         instance.is_canceled = True
         instance.cancel_reason_choice = validated_data.get('cancel_reason', instance.cancel_reason_choice)
         instance.cancel_comment = validated_data.get('cancel_comment', instance.cancel_comment)

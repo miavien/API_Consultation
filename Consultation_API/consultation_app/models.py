@@ -17,6 +17,7 @@ class User(AbstractUser):
     is_blocked = models.BooleanField(default=False, verbose_name='Заблокирован')
     is_active = models.BooleanField(default=False)
     activation_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    email = models.EmailField(unique=True)
 
     def __str__(self):
         return self.username
