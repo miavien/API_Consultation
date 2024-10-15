@@ -122,7 +122,7 @@ class TestClientConsultationAPIView:
         response = authenticated_api_client.post(url, request_data)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data['message'] == 'Для данного слота уже существует подтверждённая консультация'
+        assert response.data['detail'] == 'Для данного слота уже существует подтверждённая консультация'
 
     def test_create_consultation_already_sent(self, user_client, authenticated_api_client, valid_slot):
         slot = Slot.objects.create(**valid_slot)
@@ -132,7 +132,7 @@ class TestClientConsultationAPIView:
         response = authenticated_api_client.post(url, request_data)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data['message'] == 'Вы уже отправили запрос на консультацию на эту дату'
+        assert response.data['detail'] == 'Вы уже отправили запрос на консультацию на эту дату'
 
     def test_create_consultation_invalid_date(self, authenticated_api_client, valid_slot):
         invalid_data = valid_slot.copy()
@@ -146,7 +146,7 @@ class TestClientConsultationAPIView:
         response = authenticated_api_client.post(url, request_data)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data['message'] == 'Дата и время консультации не могут быть ранее текущего времени'
+        assert response.data['detail'] == 'Дата и время консультации не могут быть ранее текущего времени'
 
     def test_create_consultation_invalid_id(self, authenticated_api_client):
         non_existent_slot_id = 9999
@@ -154,9 +154,8 @@ class TestClientConsultationAPIView:
         request_data = {'slot_id': non_existent_slot_id}
         response = authenticated_api_client.post(url, request_data)
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'slot_id' in response.data
-        assert response.data['slot_id'][0] == 'Слота с таким id не существует'
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data['detail'] == 'Слота с таким id не существует'
 
 
 @pytest.mark.django_db(transaction=True)
@@ -199,6 +198,8 @@ class TestClientConsultationListView:
 class TestCancelConsultationAPIView:
 
     def test_cancel_consultation_success(self, authenticated_api_client, consultation):
+        consultation.status = 'Accepted'
+        consultation.save()
         url = reverse('cancel-consultation')
         data = {
             'consultation_id': consultation.id,
@@ -213,6 +214,18 @@ class TestCancelConsultationAPIView:
         assert consultation.is_canceled is True
         assert consultation.cancel_comment == 'Some reason'
         assert consultation.cancel_reason_choice == 'Personal'
+
+    def test_cancel_consultation_not_accepted(self, authenticated_api_client, consultation):
+        url = reverse('cancel-consultation')
+        data = {
+            'consultation_id': consultation.id,
+            'cancel_comment': 'Some reason',
+            'cancel_reason': 'Personal'
+        }
+        response = authenticated_api_client.patch(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data['detail'] == 'Можно отменить только принятую консультацию'
 
     def test_cancel_consultation_invalid_reason(self, authenticated_api_client, consultation):
         url = reverse('cancel-consultation')
@@ -248,10 +261,8 @@ class TestCancelConsultationAPIView:
 
         response = authenticated_api_client.patch(url, data)
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'consultation_id' in response.data
-        assert response.data['consultation_id'][
-                   0] == 'Консультации с таким id не существует'
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data['detail'] == 'Вашей консультации с таким id не существует'
 
     def test_cancel_consultation_invalid_client(self, authenticated_api_client, api_client, consultation):
         User = get_user_model()
@@ -271,8 +282,8 @@ class TestCancelConsultationAPIView:
 
         response = api_client.patch(url, data)
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert response.data['message'] == 'Вы не можете отменить эту консультацию, так как вы не являетесь её клиентом'
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data['detail'] == 'Вашей консультации с таким id не существует'
 
     def test_cancel_consultation_not_client(self, authenticated_api_specialist, consultation):
         url = reverse('cancel-consultation')
@@ -286,6 +297,7 @@ class TestCancelConsultationAPIView:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_cancel_consultation_already_canceled(self, authenticated_api_client, consultation):
+        consultation.status = 'Accepted'
         consultation.is_canceled = True
         consultation.save()
 
@@ -298,4 +310,4 @@ class TestCancelConsultationAPIView:
         response = authenticated_api_client.patch(url, data)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data['message'] == 'Вы уже отменили консультацию'
+        assert response.data['detail'] == 'Вы уже отменили консультацию'

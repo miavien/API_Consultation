@@ -285,7 +285,6 @@ class TestSpecialistConsultationListView:
 
 @pytest.mark.django_db
 class TestUpdateStatusConsultationAPIView:
-
     def test_update_status_success(self, authenticated_api_specialist, consultation, slot):
         url = reverse('update-status')
         data = {
@@ -321,8 +320,8 @@ class TestUpdateStatusConsultationAPIView:
         }
         response = authenticated_api_specialist.patch(url, data)
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'consultation_id' in response.data
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data['detail'] == 'Вашей консультации с таким id не существует'
 
     def test_update_status_non_specialist(self, authenticated_api_client, consultation):
         url = reverse('update-status')
@@ -367,8 +366,8 @@ class TestSlotUpdateAPIView:
         }
         response = authenticated_api_specialist.patch(url, data)
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data['message'] == 'Вашего слота с таким id не существует'
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data['detail'] == 'Вашего слота с таким id не существует'
 
     def test_update_slot_missing_id(self, authenticated_api_specialist):
         url = reverse('update-slot')
@@ -379,7 +378,7 @@ class TestSlotUpdateAPIView:
         response = authenticated_api_specialist.patch(url, data)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data['message'] == 'Необходимо указать id слота'
+        assert response.data['detail'] == 'Необходимо указать id слота'
 
     def test_update_slot_invalid_specialist_username(self, authenticated_api_specialist, slot):
         url = reverse('update-slot')

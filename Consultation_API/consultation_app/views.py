@@ -734,7 +734,7 @@ class SlotUpdateAPIView(APIView):
 
         if not slot:
             logger.warning(f'Slot with id={slot_id} is not exists')
-            return Response({'detail': 'Вашего слота с таким id не существует'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Вашего слота с таким id не существует'}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = SlotUpdateSerializer(slot, data=request.data, partial=True)
         if serializer.is_valid():
